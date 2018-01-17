@@ -10,7 +10,7 @@ python的序列包括：`字符串(str)`  `列表(list)`  `元组(tuple)`
 序列操作符  | 作用
 --- | ---
 seq[index] | 获得序列seq下表为index的元素
-seq[beg:end:step] | 切片，获得下表beg至end间隔step的元素集合
+`seq[beg:end:step]` | 切片，获得下表beg至end间隔step的元素集合
 seq * expr | 返回seq 重复expr 次的新序列
 seq1 + seq2  | 连接seq1和seq2，得到一个新的序列
 obj `in` seq | 若元素obj在序列seq中，返回True，否则返回False
