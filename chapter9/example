@@ -1,0 +1,52 @@
+#-*- coding: utf-8 -*-
+
+#this is a test file
+
+File Filtering. Display all lines of a file, except those that start
+with a pound sign ( # ), the comment character for Python,
+Perl, Tcl, and most other scripting languages.
+Extra credit: Also strip out comments that begin after the first
+character.
+
+the fileinput module iterates over a set of input files and reads their contents
+one line at a time, allowing you to iterate over each line, much like the way
+the Perl ( < > ) operator works without any provided arguments. File names that
+are not explicitly given will be assumed to be provided from the command-line.
+The glob and fnmatch modules allow for file name pattern-matching in the
+good old-fashioned Unix shell-style, for example, using the asterisk ( * ) wildcard
+character for all string matches and the ( ? ) for matching single characters.
+
+The gzip and zlib modules provide direct file access to the zlib compression
+library. The gzip module, written on top of the zlib module,allows for 
+standard file access, but provides for automatic gzip-compatible compression 
+and decompression. bz2 is like gzip but for bzipped files.
+The zipfile module introduced in 1.6 allows the programmer to create,
+modify, and read zip archive files. (The tarfile module serves as an equivalent
+for TAR archive files.) In 2.3, Python was given the ability to import modules
+archived in zip files as well. See Section 12.5.7 for more information.
+The shutil module furnishes high-level file access, performing such
+functions as copying files, copying file permissions, and recursive directory
+tree copying, to name a few.
+The tempfile module can be used to generate temporary filenames and files.
+In our earlier chapter on strings, we described the StringIO module (and
+its C-compiled companion cStringIO), and how it overlays a file interface
+on top of string objects. This interface includes all of the standard methods
+available to regular file objects.
+The modules we mentioned in the Persistent Storage section above
+(Section 9.9) include examples of a hybrid file- and dictionary-like object.
+
+Some other Python modules that generate file-like objects include network
+and file socket objects (socket module), the popen*() file objects that connect
+your application to other running processes (os and popen2 modules), the
+fdopen() file object used in low-level file access (os module), and opening a
+network connection to an Internet Web server via its Uniform Resource Locator
+(URL) address (urllib module). Please be aware that not all standard file
+methods may be implemented for these objects. Likewise, they may provide
+functionality in addition to what is available for regular files.
+Refer to the documentation for more details on these file access-related
+modules. In addition, you can find out more about file()/open(), files, file
+objects, and UNS at:
+    http://docs.python.org/lib/built-in-funcs.html
+    http://docs.python.org/lib/bltin-file-objects.html
+    http://www.python.org/doc/2.3/whatsnew/node7.html
+    http://www.python.org/doc/peps/pep-0278/

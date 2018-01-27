@@ -1,0 +1,3406 @@
+abc
+"""Abstract Base Classes (ABCs) according to PEP 3119."""
+
+==========================================================================================
+aifc
+"""Stuff to parse AIFF-C and AIFF files.
+
+Unless explicitly stated otherwise, the description below is true
+both for AIFF-C files and AIFF files.
+
+An AIFF-C file has the following structure.
+
+  +-----------------+
+  | FORM            |
+  +-----------------+
+  | <size>          |
+  +----+------------+
+  |    | AIFC       |
+  |    +------------+
+  |    | <chunks>   |
+  |    |    .       |
+  |    |    .       |
+  |    |    .       |
+  +----+------------+
+
+An AIFF file has the string "AIFF" instead of "AIFC".
+
+A chunk consists of an identifier (4 bytes) followed by a size (4 bytes,
+big endian order), followed by the data.  The size field does not include
+the size of the 8 byte header.
+
+The following chunk types are recognized.
+
+  FVER
+      <version number of AIFF-C defining document> (AIFF-C only).
+  MARK
+      <# of markers> (2 bytes)
+      list of markers:
+          <marker ID> (2 bytes, must be > 0)
+          <position> (4 bytes)
+          <marker name> ("pstring")
+  COMM
+      <# of channels> (2 bytes)
+      <# of sound frames> (4 bytes)
+      <size of the samples> (2 bytes)
+      <sampling frequency> (10 bytes, IEEE 80-bit extended
+          floating point)
+      in AIFF-C files only:
+      <compression type> (4 bytes)
+      <human-readable version of compression type> ("pstring")
+  SSND
+      <offset> (4 bytes, not used by this program)
+      <blocksize> (4 bytes, not used by this program)
+      <sound data>
+
+A pstring consists of 1 byte length, a string of characters, and 0 or 1
+byte pad to make the total length even.
+
+Usage.
+
+Reading AIFF files:
+  f = aifc.open(file, 'r')
+where file is either the name of a file or an open file pointer.
+The open file pointer must have methods read(), seek(), and close().
+In some types of audio files, if the setpos() method is not used,
+the seek() method is not necessary.
+
+This returns an instance of a class with the following public methods:
+  getnchannels()  -- returns number of audio channels (1 for
+             mono, 2 for stereo)
+  getsampwidth()  -- returns sample width in bytes
+  getframerate()  -- returns sampling frequency
+  getnframes()    -- returns number of audio frames
+  getcomptype()   -- returns compression type ('NONE' for AIFF files)
+  getcompname()   -- returns human-readable version of
+             compression type ('not compressed' for AIFF files)
+  getparams() -- returns a namedtuple consisting of all of the
+             above in the above order
+  getmarkers()    -- get the list of marks in the audio file or None
+             if there are no marks
+  getmark(id) -- get mark with the specified id (raises an error
+             if the mark does not exist)
+  readframes(n)   -- returns at most n frames of audio
+  rewind()    -- rewind to the beginning of the audio stream
+  setpos(pos) -- seek to the specified position
+  tell()      -- return the current position
+  close()     -- close the instance (make it unusable)
+The position returned by tell(), the position given to setpos() and
+the position of marks are all compatible and have nothing to do with
+the actual position in the file.
+The close() method is called automatically when the class instance
+is destroyed.
+
+Writing AIFF files:
+  f = aifc.open(file, 'w')
+where file is either the name of a file or an open file pointer.
+The open file pointer must have methods write(), tell(), seek(), and
+close().
+
+This returns an instance of a class with the following public methods:
+  aiff()      -- create an AIFF file (AIFF-C default)
+  aifc()      -- create an AIFF-C file
+  setnchannels(n) -- set the number of channels
+  setsampwidth(n) -- set the sample width
+  setframerate(n) -- set the frame rate
+  setnframes(n)   -- set the number of frames
+  setcomptype(type, name)
+          -- set the compression type and the
+             human-readable compression type
+  setparams(tuple)
+          -- set all parameters at once
+  setmark(id, pos, name)
+          -- add specified mark to the list of marks
+  tell()      -- return current position in output file (useful
+             in combination with setmark())
+  writeframesraw(data)
+          -- write audio frames without pathing up the
+             file header
+  writeframes(data)
+          -- write audio frames and patch up the file header
+  close()     -- patch up the file header and close the
+             output file
+You should set the parameters before the first writeframesraw or
+writeframes.  The total number of frames does not need to be set,
+but when it is set to the correct value, the header does not have to
+be patched up.
+It is best to first set all parameters, perhaps possibly the
+compression type, and then write audio frames using writeframesraw.
+When all frames have been written, either call writeframes(b'') or
+close() to patch up the sizes in the header.
+Marks can be added anytime.  If there are any marks, you must call
+close() after all frames have been written.
+The close() method is called automatically when the class instance
+is destroyed.
+
+When a file is opened with the extension '.aiff', an AIFF file is
+written, otherwise an AIFF-C file is written.  This default can be
+changed by calling aiff() or aifc() before the first writeframes or
+writeframesraw.
+"""
+
+==========================================================================================
+argparse
+"""Command-line parsing library
+
+This module is an optparse-inspired command-line parsing library that:
+
+    - handles both optional and positional arguments
+    - produces highly informative usage messages
+    - supports parsers that dispatch to sub-parsers
+
+The following is a simple usage example that sums integers from the
+command-line and writes the result to a file::
+
+    parser = argparse.ArgumentParser(
+        description='sum the integers at the command line')
+    parser.add_argument(
+        'integers', metavar='int', nargs='+', type=int,
+        help='an integer to be summed')
+    parser.add_argument(
+        '--log', default=sys.stdout, type=argparse.FileType('w'),
+        help='the file where the sum should be written')
+    args = parser.parse_args()
+    args.log.write('%s' % sum(args.integers))
+    args.log.close()
+
+The module contains the following public classes:
+
+    - ArgumentParser -- The main entry point for command-line parsing. As the
+        example above shows, the add_argument() method is used to populate
+        the parser with actions for optional and positional arguments. Then
+        the parse_args() method is invoked to convert the args at the
+        command-line into an object with attributes.
+
+    - ArgumentError -- The exception raised by ArgumentParser objects when
+        there are errors with the parser's actions. Errors raised while
+        parsing the command-line are caught by ArgumentParser and emitted
+        as command-line messages.
+
+    - FileType -- A factory for defining types of files to be created. As the
+        example above shows, instances of FileType are typically passed as
+        the type= argument of add_argument() calls.
+
+    - Action -- The base class for parser actions. Typically actions are
+        selected by passing strings like 'store_true' or 'append_const' to
+        the action= argument of add_argument(). However, for greater
+        customization of ArgumentParser actions, subclasses of Action may
+        be defined and passed as the action= argument.
+
+    - HelpFormatter, RawDescriptionHelpFormatter, RawTextHelpFormatter,
+        ArgumentDefaultsHelpFormatter -- Formatter classes which
+        may be passed as the formatter_class= argument to the
+        ArgumentParser constructor. HelpFormatter is the default,
+        RawDescriptionHelpFormatter and RawTextHelpFormatter tell the parser
+        not to change the formatting for help text, and
+        ArgumentDefaultsHelpFormatter adds information about argument defaults
+        to the help.
+
+All other classes in this module are considered implementation details.
+(Also note that HelpFormatter and RawDescriptionHelpFormatter are only
+considered public as object names -- the API of the formatter objects is
+still considered an implementation detail.)
+"""
+
+==========================================================================================
+ast
+"""
+
+==========================================================================================
+asynchat
+r"""A class supporting chat-style (command/response) protocols.
+
+This class adds support for 'chat' style protocols - where one side
+sends a 'command', and the other sends a response (examples would be
+the common internet protocols - smtp, nntp, ftp, etc..).
+
+The handle_read() method looks at the input stream for the current
+'terminator' (usually '\r\n' for single-line responses, '\r\n.\r\n'
+for multi-line output), calling self.found_terminator() on its
+receipt.
+
+for example:
+Say you build an async nntp client using this class.  At the start
+of the connection, you'll have self.terminator set to '\r\n', in
+order to process the single-line greeting.  Just before issuing a
+'LIST' command you'll set it to '\r\n.\r\n'.  The output of the LIST
+command will be accumulated (using your own 'collect_incoming_data'
+method) up to the terminator, and then control will be returned to
+you - by calling your self.found_terminator() method.
+"""
+
+==========================================================================================
+asyncore
+"""Basic infrastructure for asynchronous socket service clients and servers.
+
+There are only two ways to have a program on a single processor do "more
+than one thing at a time".  Multi-threaded programming is the simplest and
+most popular way to do it, but there is another very different technique,
+that lets you have nearly all the advantages of multi-threading, without
+actually using multiple threads. it's really only practical if your program
+is largely I/O bound. If your program is CPU bound, then pre-emptive
+scheduled threads are probably what you really need. Network servers are
+rarely CPU-bound, however.
+
+If your operating system supports the select() system call in its I/O
+library (and nearly all do), then you can use it to juggle multiple
+communication channels at once; doing other work while your I/O is taking
+place in the "background."  Although this strategy can seem strange and
+complex, especially at first, it is in many ways easier to understand and
+control than multi-threaded programming. The module documented here solves
+many of the difficult problems for you, making the task of building
+sophisticated high-performance network servers and clients a snap.
+"""
+
+==========================================================================================
+base64
+"""Base16, Base32, Base64 (RFC 3548), Base85 and Ascii85 data encodings"""
+
+==========================================================================================
+bdb
+"""Debugger basics"""
+
+==========================================================================================
+binhex
+"""Macintosh binhex compression/decompression.
+
+easy interface:
+binhex(inputfilename, outputfilename)
+hexbin(inputfilename, outputfilename)
+"""
+
+==========================================================================================
+bisect
+"""Bisection algorithms."""
+
+==========================================================================================
+bz2
+"""Interface to the libbzip2 compression library.
+
+This module provides a file interface, classes for incremental
+(de)compression, and functions for one-shot (de)compression.
+"""
+
+==========================================================================================
+calendar
+"""Calendar printing functions
+
+Note when comparing these calendars to the ones printed by cal(1): By
+default, these calendars have Monday as the first day of the week, and
+Sunday as the last (the European convention). Use setfirstweekday() to
+set the first day of the week (0=Monday, 6=Sunday)."""
+
+==========================================================================================
+cgi
+"""Support module for CGI (Common Gateway Interface) scripts.
+
+This module defines a number of utilities for use by CGI scripts
+written in Python.
+"""
+
+==========================================================================================
+cgitb
+"""More comprehensive traceback formatting for Python scripts.
+
+To enable this module, do:
+
+    import cgitb; cgitb.enable()
+
+at the top of your script.  The optional arguments to enable() are:
+
+    display     - if true, tracebacks are displayed in the web browser
+    logdir      - if set, tracebacks are written to files in this directory
+    context     - number of lines of source code to show for each stack frame
+    format      - 'text' or 'html' controls the output format
+
+By default, tracebacks are displayed but not saved, the context is 5 lines
+and the output format is 'html' (for backwards compatibility with the
+original use of this module)
+
+Alternatively, if you have caught an exception and want cgitb to display it
+for you, call cgitb.handler().  The optional argument to handler() is a
+3-item tuple (etype, evalue, etb) just like the value of sys.exc_info().
+The default handler displays output as HTML.
+
+"""
+
+==========================================================================================
+chunk
+"""Simple class to read IFF chunks.
+
+An IFF chunk (used in formats such as AIFF, TIFF, RMFF (RealMedia File
+Format)) has the following structure:
+
++----------------+
+| ID (4 bytes)   |
++----------------+
+| size (4 bytes) |
++----------------+
+| data           |
+| ...            |
++----------------+
+
+The ID is a 4-byte string which identifies the type of chunk.
+
+The size field (a 32-bit value, encoded using big-endian byte order)
+gives the size of the whole chunk, including the 8-byte header.
+
+Usually an IFF-type file consists of one or more chunks.  The proposed
+usage of the Chunk class defined here is to instantiate an instance at
+the start of each chunk and read from the instance until it reaches
+the end, after which a new instance can be instantiated.  At the end
+of the file, creating a new instance will fail with an EOFError
+exception.
+
+Usage:
+while True:
+    try:
+        chunk = Chunk(file)
+    except EOFError:
+        break
+    chunktype = chunk.getname()
+    while True:
+        data = chunk.read(nbytes)
+        if not data:
+            pass
+        # do something with data
+
+The interface is file-like.  The implemented methods are:
+read, close, seek, tell, isatty.
+Extra methods are: skip() (called by close, skips to the end of the chunk),
+getname() (returns the name (ID) of the chunk)
+
+The __init__ method has one required argument, a file-like object
+(including a chunk instance), and one optional argument, a flag which
+specifies whether or not chunks are aligned on 2-byte boundaries.  The
+default is 1, i.e. aligned.
+"""
+
+==========================================================================================
+cmd
+"""A generic class to build line-oriented command interpreters.
+
+Interpreters constructed with this class obey the following conventions:
+
+1. End of file on input is processed as the command 'EOF'.
+2. A command is parsed out of each line by collecting the prefix composed
+   of characters in the identchars member.
+3. A command `foo' is dispatched to a method 'do_foo()'; the do_ method
+   is passed a single argument consisting of the remainder of the line.
+4. Typing an empty line repeats the last command.  (Actually, it calls the
+   method `emptyline', which may be overridden in a subclass.)
+5. There is a predefined `help' method.  Given an argument `topic', it
+   calls the command `help_topic'.  With no arguments, it lists all topics
+   with defined help_ functions, broken into up to three topics; documented
+   commands, miscellaneous help topics, and undocumented commands.
+6. The command '?' is a synonym for `help'.  The command '!' is a synonym
+   for `shell', if a do_shell method exists.
+7. If completion is enabled, completing commands will be done automatically,
+   and completing of commands args is done by calling complete_foo() with
+   arguments text, line, begidx, endidx.  text is string we are matching
+   against, all returned matches must begin with it.  line is the current
+   input line (lstripped), begidx and endidx are the beginning and end
+   indexes of the text being matched, which could be used to provide
+   different completion depending upon which position the argument is in.
+
+The `default' method may be overridden to intercept commands for which there
+is no do_ method.
+
+The `completedefault' method may be overridden to intercept completions for
+commands that have no complete_ method.
+
+The data member `self.ruler' sets the character used to draw separator lines
+in the help messages.  If empty, no ruler line is drawn.  It defaults to "=".
+
+If the value of `self.intro' is nonempty when the cmdloop method is called,
+it is printed out on interpreter startup.  This value may be overridden
+via an optional argument to the cmdloop() method.
+
+The data members `self.doc_header', `self.misc_header', and
+`self.undoc_header' set the headers used for the help function's
+listings of documented functions, miscellaneous topics, and undocumented
+functions respectively.
+"""
+
+==========================================================================================
+code
+"""Utilities needed to emulate Python's interactive interpreter.
+
+"""
+
+==========================================================================================
+codecs
+""" codecs -- Python Codec Registry, API and helpers.
+
+
+Written by Marc-Andre Lemburg (mal@lemburg.com).
+
+(c) Copyright CNRI, All Rights Reserved. NO WARRANTY.
+
+"""#"
+
+import builtins, sys
+
+
+try:
+    from _codecs import *
+except ImportError as why:
+    raise SystemError('Failed to load the builtin codecs: %s' % why)
+
+__all__ = ["register", "lookup", "open", "EncodedFile", "BOM", "BOM_BE",
+           "BOM_LE", "BOM32_BE", "BOM32_LE", "BOM64_BE", "BOM64_LE",
+           "BOM_UTF8", "BOM_UTF16", "BOM_UTF16_LE", "BOM_UTF16_BE",
+           "BOM_UTF32", "BOM_UTF32_LE", "BOM_UTF32_BE",
+           "CodecInfo", "Codec", "IncrementalEncoder", "IncrementalDecoder",
+           "StreamReader", "StreamWriter",
+           "StreamReaderWriter", "StreamRecoder",
+           "getencoder", "getdecoder", "getincrementalencoder",
+           "getincrementaldecoder", "getreader", "getwriter",
+           "encode", "decode", "iterencode", "iterdecode",
+           "strict_errors", "ignore_errors", "replace_errors",
+           "xmlcharrefreplace_errors",
+           "backslashreplace_errors", "namereplace_errors",
+           "register_error", "lookup_error"]
+
+
+
+BOM_UTF8 = b'\xef\xbb\xbf'
+
+BOM_LE = BOM_UTF16_LE = b'\xff\xfe'
+
+BOM_BE = BOM_UTF16_BE = b'\xfe\xff'
+
+BOM_UTF32_LE = b'\xff\xfe\x00\x00'
+
+BOM_UTF32_BE = b'\x00\x00\xfe\xff'
+
+if sys.byteorder == 'little':
+
+    # UTF-16, native endianness
+    BOM = BOM_UTF16 = BOM_UTF16_LE
+
+    # UTF-32, native endianness
+    BOM_UTF32 = BOM_UTF32_LE
+
+else:
+
+    # UTF-16, native endianness
+    BOM = BOM_UTF16 = BOM_UTF16_BE
+
+    # UTF-32, native endianness
+    BOM_UTF32 = BOM_UTF32_BE
+
+BOM32_LE = BOM_UTF16_LE
+BOM32_BE = BOM_UTF16_BE
+BOM64_LE = BOM_UTF32_LE
+BOM64_BE = BOM_UTF32_BE
+
+
+
+class CodecInfo(tuple):
+    """Codec details when looking up the codec registry"""
+
+==========================================================================================
+codeop
+r"""Utilities to compile possibly incomplete Python source code.
+
+This module provides two interfaces, broadly similar to the builtin
+function compile(), which take program text, a filename and a 'mode'
+and:
+
+- Return code object if the command is complete and valid
+- Return None if the command is incomplete
+- Raise SyntaxError, ValueError or OverflowError if the command is a
+  syntax error (OverflowError and ValueError can be produced by
+  malformed literals).
+
+Approach:
+
+First, check if the source consists entirely of blank lines and
+comments; if so, replace it with 'pass', because the built-in
+parser doesn't always do the right thing for these.
+
+Compile three times: as is, with \n, and with \n\n appended.  If it
+compiles as is, it's complete.  If it compiles with one \n appended,
+we expect more.  If it doesn't compile either way, we compare the
+error we get when compiling with \n or \n\n appended.  If the errors
+are the same, the code is broken.  But if the errors are different, we
+expect more.  Not intuitive; not even guaranteed to hold in future
+releases; but this matches the compiler's behavior from Python 1.4
+through 2.2, at least.
+
+Caveat:
+
+It is possible (but not likely) that the parser stops parsing with a
+successful outcome before reaching the end of the source; in this
+case, trailing symbols may be ignored instead of causing an error.
+For example, a backslash followed by two newlines may be followed by
+arbitrary garbage.  This will be fixed once the API for the parser is
+better.
+
+The two interfaces are:
+
+compile_command(source, filename, symbol):
+
+    Compiles a single command in the manner described above.
+
+CommandCompiler():
+
+    Instances of this class have __call__ methods identical in
+    signature to compile_command; the difference is that if the
+    instance compiles program text containing a __future__ statement,
+    the instance 'remembers' and compiles all subsequent program texts
+    with the statement in force.
+
+The module also provides another class:
+
+Compile():
+
+    Instances of this class act like the built-in function compile,
+    but with 'memory' in the sense described above.
+"""
+
+==========================================================================================
+colorsys
+"""Conversion functions between RGB and other color systems.
+
+This modules provides two functions for each color system ABC:
+
+  rgb_to_abc(r, g, b) --> a, b, c
+  abc_to_rgb(a, b, c) --> r, g, b
+
+All inputs and outputs are triples of floats in the range [0.0...1.0]
+(with the exception of I and Q, which covers a slightly larger range).
+Inputs outside the valid range may cause exceptions or invalid outputs.
+
+Supported color systems:
+RGB: Red, Green, Blue components
+YIQ: Luminance, Chrominance (used by composite video signals)
+HLS: Hue, Luminance, Saturation
+HSV: Hue, Saturation, Value
+"""
+
+==========================================================================================
+compileall
+"""Module/script to byte-compile all .py files to .pyc files.
+
+When called as a script with arguments, this compiles the directories
+given as arguments recursively; the -l option prevents it from
+recursing into directories.
+
+Without arguments, if compiles all modules on sys.path, without
+recursing into subdirectories.  (Even though it should do so for
+packages -- for now, you'll have to deal with packages separately.)
+
+See module py_compile for details of the actual byte-compilation.
+"""
+
+==========================================================================================
+configparser
+"""Configuration file parser.
+
+A configuration file consists of sections, lead by a "[section]" header,
+and followed by "name: value" entries, with continuations and such in
+the style of RFC 822.
+
+Intrinsic defaults can be specified by passing them into the
+ConfigParser constructor as a dictionary.
+
+class:
+
+ConfigParser -- responsible for parsing a list of
+                    configuration files, and managing the parsed database.
+
+    methods:
+
+    __init__(defaults=None, dict_type=_default_dict, allow_no_value=False,
+             delimiters=('=', ':'), comment_prefixes=('#', ';'),
+             inline_comment_prefixes=None, strict=True,
+             empty_lines_in_values=True, default_section='DEFAULT',
+             interpolation=<unset>, converters=<unset>):
+        Create the parser. When `defaults' is given, it is initialized into the
+        dictionary or intrinsic defaults. The keys must be strings, the values
+        must be appropriate for %()s string interpolation.
+
+        When `dict_type' is given, it will be used to create the dictionary
+        objects for the list of sections, for the options within a section, and
+        for the default values.
+
+        When `delimiters' is given, it will be used as the set of substrings
+        that divide keys from values.
+
+        When `comment_prefixes' is given, it will be used as the set of
+        substrings that prefix comments in empty lines. Comments can be
+        indented.
+
+        When `inline_comment_prefixes' is given, it will be used as the set of
+        substrings that prefix comments in non-empty lines.
+
+        When `strict` is True, the parser won't allow for any section or option
+        duplicates while reading from a single source (file, string or
+        dictionary). Default is True.
+
+        When `empty_lines_in_values' is False (default: True), each empty line
+        marks the end of an option. Otherwise, internal empty lines of
+        a multiline option are kept as part of the value.
+
+        When `allow_no_value' is True (default: False), options without
+        values are accepted; the value presented for these is None.
+
+        When `default_section' is given, the name of the special section is
+        named accordingly. By default it is called ``"DEFAULT"`` but this can
+        be customized to point to any other valid section name. Its current
+        value can be retrieved using the ``parser_instance.default_section``
+        attribute and may be modified at runtime.
+
+        When `interpolation` is given, it should be an Interpolation subclass
+        instance. It will be used as the handler for option value
+        pre-processing when using getters. RawConfigParser object s don't do
+        any sort of interpolation, whereas ConfigParser uses an instance of
+        BasicInterpolation. The library also provides a ``zc.buildbot``
+        inspired ExtendedInterpolation implementation.
+
+        When `converters` is given, it should be a dictionary where each key
+        represents the name of a type converter and each value is a callable
+        implementing the conversion from string to the desired datatype. Every
+        converter gets its corresponding get*() method on the parser object and
+        section proxies.
+
+    sections()
+        Return all the configuration section names, sans DEFAULT.
+
+    has_section(section)
+        Return whether the given section exists.
+
+    has_option(section, option)
+        Return whether the given option exists in the given section.
+
+    options(section)
+        Return list of configuration options for the named section.
+
+    read(filenames, encoding=None)
+        Read and parse the list of named configuration files, given by
+        name.  A single filename is also allowed.  Non-existing files
+        are ignored.  Return list of successfully read files.
+
+    read_file(f, filename=None)
+        Read and parse one configuration file, given as a file object.
+        The filename defaults to f.name; it is only used in error
+        messages (if f has no `name' attribute, the string `<???>' is used).
+
+    read_string(string)
+        Read configuration from a given string.
+
+    read_dict(dictionary)
+        Read configuration from a dictionary. Keys are section names,
+        values are dictionaries with keys and values that should be present
+        in the section. If the used dictionary type preserves order, sections
+        and their keys will be added in order. Values are automatically
+        converted to strings.
+
+    get(section, option, raw=False, vars=None, fallback=_UNSET)
+        Return a string value for the named option.  All % interpolations are
+        expanded in the return values, based on the defaults passed into the
+        constructor and the DEFAULT section.  Additional substitutions may be
+        provided using the `vars' argument, which must be a dictionary whose
+        contents override any pre-existing defaults. If `option' is a key in
+        `vars', the value from `vars' is used.
+
+    getint(section, options, raw=False, vars=None, fallback=_UNSET)
+        Like get(), but convert value to an integer.
+
+    getfloat(section, options, raw=False, vars=None, fallback=_UNSET)
+        Like get(), but convert value to a float.
+
+    getboolean(section, options, raw=False, vars=None, fallback=_UNSET)
+        Like get(), but convert value to a boolean (currently case
+        insensitively defined as 0, false, no, off for False, and 1, true,
+        yes, on for True).  Returns False or True.
+
+    items(section=_UNSET, raw=False, vars=None)
+        If section is given, return a list of tuples with (name, value) for
+        each option in the section. Otherwise, return a list of tuples with
+        (section_name, section_proxy) for each section, including DEFAULTSECT.
+
+    remove_section(section)
+        Remove the given file section and all its options.
+
+    remove_option(section, option)
+        Remove the given option from the given section.
+
+    set(section, option, value)
+        Set the given option.
+
+    write(fp, space_around_delimiters=True)
+        Write the configuration state in .ini format. If
+        `space_around_delimiters' is True (the default), delimiters
+        between keys and values are surrounded by spaces.
+"""
+
+==========================================================================================
+contextlib
+"""Utilities for with-statement contexts.  See PEP 343."""
+
+==========================================================================================
+copy
+"""Generic (shallow and deep) copying operations.
+
+Interface summary:
+
+        import copy
+
+        x = copy.copy(y)        # make a shallow copy of y
+        x = copy.deepcopy(y)    # make a deep copy of y
+
+For module specific errors, copy.Error is raised.
+
+The difference between shallow and deep copying is only relevant for
+compound objects (objects that contain other objects, like lists or
+class instances).
+
+- A shallow copy constructs a new compound object and then (to the
+  extent possible) inserts *the same objects* into it that the
+  original contains.
+
+- A deep copy constructs a new compound object and then, recursively,
+  inserts *copies* into it of the objects found in the original.
+
+Two problems often exist with deep copy operations that don't exist
+with shallow copy operations:
+
+ a) recursive objects (compound objects that, directly or indirectly,
+    contain a reference to themselves) may cause a recursive loop
+
+ b) because deep copy copies *everything* it may copy too much, e.g.
+    administrative data structures that should be shared even between
+    copies
+
+Python's deep copy operation avoids these problems by:
+
+ a) keeping a table of objects already copied during the current
+    copying pass
+
+ b) letting user-defined classes override the copying operation or the
+    set of components copied
+
+This version does not copy types like module, class, function, method,
+nor stack trace, stack frame, nor file, socket, window, nor array, nor
+any similar types.
+
+Classes can use the same interfaces to control copying that they use
+to control pickling: they can define methods called __getinitargs__(),
+__getstate__() and __setstate__().  See the documentation for module
+"pickle" for information on these methods.
+"""
+
+==========================================================================================
+copyreg
+"""Helper to provide extensibility for pickle.
+
+This is only useful to add pickle support for extension types defined in
+C, not for instances of user-defined classes.
+"""
+
+==========================================================================================
+cProfile
+"""Python interface for the 'lsprof' profiler.
+   Compatible with the 'profile' module.
+"""
+
+==========================================================================================
+crypt
+"""Wrapper to the POSIX crypt library call and associated functionality."""
+
+==========================================================================================
+csv
+"""
+
+==========================================================================================
+datetime
+"""Concrete date/time and related types.
+
+See http://www.iana.org/time-zones/repository/tz-link.html for
+time zone and DST data sources.
+"""
+
+==========================================================================================
+difflib
+"""
+
+==========================================================================================
+dis
+"""Disassembler of Python byte code into mnemonics."""
+
+==========================================================================================
+doctest
+r"""Module doctest -- a framework for running examples in docstrings.
+
+In simplest use, end each module M to be tested with:
+
+def _test():
+    import doctest
+    doctest.testmod()
+
+if __name__ == "__main__":
+    _test()
+
+Then running the module as a script will cause the examples in the
+docstrings to get executed and verified:
+
+python M.py
+
+This won't display anything unless an example fails, in which case the
+failing example(s) and the cause(s) of the failure(s) are printed to stdout
+(why not stderr? because stderr is a lame hack <0.2 wink>), and the final
+line of output is "Test failed.".
+
+Run it with the -v switch instead:
+
+python M.py -v
+
+and a detailed report of all examples tried is printed to stdout, along
+with assorted summaries at the end.
+
+You can force verbose mode by passing "verbose=True" to testmod, or prohibit
+it by passing "verbose=False".  In either of those cases, sys.argv is not
+examined by testmod.
+
+There are a variety of other ways to run doctests, including integration
+with the unittest framework, and support for running non-Python text
+files containing doctests.  There are also many ways to override parts
+of doctest's default behaviors.  See the Library Reference Manual for
+details.
+"""
+
+==========================================================================================
+dummy_threading
+"""Faux ``threading`` version using ``dummy_thread`` instead of ``thread``.
+
+The module ``_dummy_threading`` is added to ``sys.modules`` in order
+to not have ``threading`` considered imported.  Had ``threading`` been
+directly imported it would have made all subsequent imports succeed
+regardless of whether ``_thread`` was available which is not desired.
+
+"""
+
+==========================================================================================
+filecmp
+"""Utilities for comparing files and directories.
+
+Classes:
+    dircmp
+
+Functions:
+    cmp(f1, f2, shallow=True) -> int
+    cmpfiles(a, b, common) -> ([], [], [])
+    clear_cache()
+
+"""
+
+==========================================================================================
+fileinput
+"""Helper class to quickly write a loop over all standard input files.
+
+Typical use is:
+
+    import fileinput
+    for line in fileinput.input():
+        process(line)
+
+This iterates over the lines of all files listed in sys.argv[1:],
+defaulting to sys.stdin if the list is empty.  If a filename is '-' it
+is also replaced by sys.stdin.  To specify an alternative list of
+filenames, pass it as the argument to input().  A single file name is
+also allowed.
+
+Functions filename(), lineno() return the filename and cumulative line
+number of the line that has just been read; filelineno() returns its
+line number in the current file; isfirstline() returns true iff the
+line just read is the first line of its file; isstdin() returns true
+iff the line was read from sys.stdin.  Function nextfile() closes the
+current file so that the next iteration will read the first line from
+the next file (if any); lines not read from the file will not count
+towards the cumulative line count; the filename is not changed until
+after the first line of the next file has been read.  Function close()
+closes the sequence.
+
+Before any lines have been read, filename() returns None and both line
+numbers are zero; nextfile() has no effect.  After all lines have been
+read, filename() and the line number functions return the values
+pertaining to the last line read; nextfile() has no effect.
+
+All files are opened in text mode by default, you can override this by
+setting the mode parameter to input() or FileInput.__init__().
+If an I/O error occurs during opening or reading a file, the OSError
+exception is raised.
+
+If sys.stdin is used more than once, the second and further use will
+return no lines, except perhaps for interactive use, or if it has been
+explicitly reset (e.g. using sys.stdin.seek(0)).
+
+Empty files are opened and immediately closed; the only time their
+presence in the list of filenames is noticeable at all is when the
+last file opened is empty.
+
+It is possible that the last line of a file doesn't end in a newline
+character; otherwise lines are returned including the trailing
+newline.
+
+Class FileInput is the implementation; its methods filename(),
+lineno(), fileline(), isfirstline(), isstdin(), nextfile() and close()
+correspond to the functions in the module.  In addition it has a
+readline() method which returns the next input line, and a
+__getitem__() method which implements the sequence behavior.  The
+sequence must be accessed in strictly sequential order; sequence
+access and readline() cannot be mixed.
+
+Optional in-place filtering: if the keyword argument inplace=1 is
+passed to input() or to the FileInput constructor, the file is moved
+to a backup file and standard output is directed to the input file.
+This makes it possible to write a filter that rewrites its input file
+in place.  If the keyword argument backup=".<some extension>" is also
+given, it specifies the extension for the backup file, and the backup
+file remains around; by default, the extension is ".bak" and it is
+deleted when the output file is closed.  In-place filtering is
+disabled when standard input is read.  XXX The current implementation
+does not work for MS-DOS 8+3 filesystems.
+
+XXX Possible additions:
+
+- optional getopt argument processing
+- isatty()
+- read(), read(size), even readlines()
+
+"""
+
+==========================================================================================
+fnmatch
+"""Filename matching with shell patterns.
+
+fnmatch(FILENAME, PATTERN) matches according to the local convention.
+fnmatchcase(FILENAME, PATTERN) always takes case in account.
+
+The functions operate by translating the pattern into a regular
+expression.  They cache the compiled regular expressions for speed.
+
+The function translate(PATTERN) returns a regular expression
+corresponding to PATTERN.  (It does not compile it.)
+"""
+
+==========================================================================================
+formatter
+"""Generic output formatting.
+
+Formatter objects transform an abstract flow of formatting events into
+specific output events on writer objects. Formatters manage several stack
+structures to allow various properties of a writer object to be changed and
+restored; writers need not be able to handle relative changes nor any sort
+of ``change back'' operation. Specific writer properties which may be
+controlled via formatter objects are horizontal alignment, font, and left
+margin indentations. A mechanism is provided which supports providing
+arbitrary, non-exclusive style settings to a writer as well. Additional
+interfaces facilitate formatting events which are not reversible, such as
+paragraph separation.
+
+Writer objects encapsulate device interfaces. Abstract devices, such as
+file formats, are supported as well as physical devices. The provided
+implementations all work with abstract devices. The interface makes
+available mechanisms for setting the properties which formatter objects
+manage and inserting data into the output.
+"""
+
+==========================================================================================
+fractions
+"""Fraction, infinite-precision, real numbers."""
+
+==========================================================================================
+ftplib
+"""An FTP client class and some helper functions.
+
+Based on RFC 959: File Transfer Protocol (FTP), by J. Postel and J. Reynolds
+
+Example:
+
+>>> from ftplib import FTP
+>>> ftp = FTP('ftp.python.org') # connect to host, default port
+>>> ftp.login() # default, i.e.: user anonymous, passwd anonymous@
+'230 Guest login ok, access restrictions apply.'
+>>> ftp.retrlines('LIST') # list directory contents
+total 9
+drwxr-xr-x   8 root     wheel        1024 Jan  3  1994 .
+drwxr-xr-x   8 root     wheel        1024 Jan  3  1994 ..
+drwxr-xr-x   2 root     wheel        1024 Jan  3  1994 bin
+drwxr-xr-x   2 root     wheel        1024 Jan  3  1994 etc
+d-wxrwxr-x   2 ftp      wheel        1024 Sep  5 13:43 incoming
+drwxr-xr-x   2 root     wheel        1024 Nov 17  1993 lib
+drwxr-xr-x   6 1094     wheel        1024 Sep 13 19:07 pub
+drwxr-xr-x   3 root     wheel        1024 Jan  3  1994 usr
+-rw-r--r--   1 root     root          312 Aug  1  1994 welcome.msg
+'226 Transfer complete.'
+>>> ftp.quit()
+'221 Goodbye.'
+>>>
+
+A nice test that reveals some of the network dialogue would be:
+python ftplib.py -d localhost -l -p -l
+"""
+
+==========================================================================================
+functools
+"""functools.py - Tools for working with functions and callable objects
+"""
+
+==========================================================================================
+genericpath
+"""
+
+==========================================================================================
+getopt
+"""Parser for command line options.
+
+This module helps scripts to parse the command line arguments in
+sys.argv.  It supports the same conventions as the Unix getopt()
+function (including the special meanings of arguments of the form `-'
+and `--').  Long options similar to those supported by GNU software
+may be used as well via an optional third argument.  This module
+provides two functions and an exception:
+
+getopt() -- Parse command line options
+gnu_getopt() -- Like getopt(), but allow option and non-option arguments
+to be intermixed.
+GetoptError -- exception (class) raised with 'opt' attribute, which is the
+option involved with the exception.
+"""
+
+==========================================================================================
+getpass
+"""Utilities to get a password and/or the current user name.
+
+getpass(prompt[, stream]) - Prompt for a password, with echo turned off.
+getuser() - Get the user name from the environment or password database.
+
+GetPassWarning - This UserWarning is issued when getpass() cannot prevent
+                 echoing of the password contents while reading.
+
+On Windows, the msvcrt module will be used.
+
+"""
+
+==========================================================================================
+gettext
+"""Internationalization and localization support.
+
+This module provides internationalization (I18N) and localization (L10N)
+support for your Python programs by providing an interface to the GNU gettext
+message catalog library.
+
+I18N refers to the operation by which a program is made aware of multiple
+languages.  L10N refers to the adaptation of your program, once
+internationalized, to the local language and cultural habits.
+
+"""
+
+==========================================================================================
+glob
+"""Filename globbing utility."""
+
+==========================================================================================
+gzip
+"""Functions that read and write gzipped files.
+
+The user of the file doesn't have to worry about the compression,
+but random access is not allowed."""
+
+==========================================================================================
+heapq
+"""Heap queue algorithm (a.k.a. priority queue).
+
+Heaps are arrays for which a[k] <= a[2*k+1] and a[k] <= a[2*k+2] for
+all k, counting elements from 0.  For the sake of comparison,
+non-existing elements are considered to be infinite.  The interesting
+property of a heap is that a[0] is always its smallest element.
+
+Usage:
+
+heap = []            # creates an empty heap
+heappush(heap, item) # pushes a new item on the heap
+item = heappop(heap) # pops the smallest item from the heap
+item = heap[0]       # smallest item on the heap without popping it
+heapify(x)           # transforms list into a heap, in-place, in linear time
+item = heapreplace(heap, item) # pops and returns smallest item, and adds
+                               # new item; the heap size is unchanged
+
+Our API differs from textbook heap algorithms as follows:
+
+- We use 0-based indexing.  This makes the relationship between the
+  index for a node and the indexes for its children slightly less
+  obvious, but is more suitable since Python uses 0-based indexing.
+
+- Our heappop() method returns the smallest item, not the largest.
+
+These two make it possible to view the heap as a regular Python list
+without surprises: heap[0] is the smallest item, and heap.sort()
+maintains the heap invariant!
+"""
+
+==========================================================================================
+hmac
+"""HMAC (Keyed-Hashing for Message Authentication) Python module.
+
+Implements the HMAC algorithm as described by RFC 2104.
+"""
+
+==========================================================================================
+imaplib
+"""IMAP4 client.
+
+Based on RFC 2060.
+
+Public class:           IMAP4
+Public variable:        Debug
+Public functions:       Internaldate2tuple
+                        Int2AP
+                        ParseFlags
+                        Time2Internaldate
+"""
+
+==========================================================================================
+imghdr
+"""Recognize image file formats based on their first few bytes."""
+
+==========================================================================================
+imp
+"""This module provides the components needed to build your own __import__
+function.  Undocumented functions are obsolete.
+
+In most cases it is preferred you consider using the importlib module's
+functionality over this module.
+
+"""
+
+==========================================================================================
+inspect
+"""Get useful information from live Python objects.
+
+This module encapsulates the interface provided by the internal special
+attributes (co_*, im_*, tb_*, etc.) in a friendlier fashion.
+It also provides some help for examining source code and class layout.
+
+Here are some of the useful functions provided by this module:
+
+    ismodule(), isclass(), ismethod(), isfunction(), isgeneratorfunction(),
+        isgenerator(), istraceback(), isframe(), iscode(), isbuiltin(),
+        isroutine() - check object types
+    getmembers() - get members of an object that satisfy a given condition
+
+    getfile(), getsourcefile(), getsource() - find an object's source code
+    getdoc(), getcomments() - get documentation on an object
+    getmodule() - determine the module that an object came from
+    getclasstree() - arrange classes so as to represent their hierarchy
+
+    getargvalues(), getcallargs() - get info about function arguments
+    getfullargspec() - same, with support for Python 3 features
+    formatargspec(), formatargvalues() - format an argument spec
+    getouterframes(), getinnerframes() - get info about frames
+    currentframe() - get the current stack frame
+    stack(), trace() - get info about frames on the stack or in a traceback
+
+    signature() - get a Signature object for the callable
+"""
+
+==========================================================================================
+io
+"""The io module provides the Python interfaces to stream handling. The
+builtin open function is defined in this module.
+
+At the top of the I/O hierarchy is the abstract base class IOBase. It
+defines the basic interface to a stream. Note, however, that there is no
+separation between reading and writing to streams; implementations are
+allowed to raise an OSError if they do not support a given operation.
+
+Extending IOBase is RawIOBase which deals simply with the reading and
+writing of raw bytes to a stream. FileIO subclasses RawIOBase to provide
+an interface to OS files.
+
+BufferedIOBase deals with buffering on a raw byte stream (RawIOBase). Its
+subclasses, BufferedWriter, BufferedReader, and BufferedRWPair buffer
+streams that are readable, writable, and both respectively.
+BufferedRandom provides a buffered interface to random access
+streams. BytesIO is a simple stream of in-memory bytes.
+
+Another IOBase subclass, TextIOBase, deals with the encoding and decoding
+of streams into text. TextIOWrapper, which extends it, is a buffered text
+interface to a buffered raw stream (`BufferedIOBase`). Finally, StringIO
+is an in-memory stream for text.
+
+Argument names are not part of the specification, and only the arguments
+of open() are intended to be used as keyword arguments.
+
+data:
+
+DEFAULT_BUFFER_SIZE
+
+   An int containing the default buffer size used by the module's buffered
+   I/O classes. open() uses the file's blksize (as obtained by os.stat) if
+   possible.
+"""
+
+==========================================================================================
+ipaddress
+"""A fast, lightweight IPv4/IPv6 manipulation library in Python.
+
+This library is used to create/poke/manipulate IPv4 and IPv6 addresses
+and networks.
+
+"""
+
+==========================================================================================
+keyword
+"""Keywords (from "graminit.c")
+
+This file is automatically generated; please don't muck it up!
+
+To update the symbols in this file, 'cd' to the top directory of
+the python source tree after building the interpreter and run:
+
+    ./python Lib/keyword.py
+"""
+
+==========================================================================================
+linecache
+"""Cache lines from Python source files.
+
+This is intended to read lines from modules imported -- hence if a filename
+is not found, it will look down the module search path for a file by
+that name.
+"""
+
+==========================================================================================
+locale
+"""Locale support module.
+
+The module provides low-level access to the C lib's locale APIs and adds high
+level number formatting APIs as well as a locale aliasing engine to complement
+these.
+
+The aliasing engine includes support for many commonly used locale names and
+maps them to values suitable for passing to the C lib's setlocale() function. It
+also includes default encodings for all supported locale names.
+
+"""
+
+==========================================================================================
+lzma
+"""Interface to the liblzma compression library.
+
+This module provides a class for reading and writing compressed files,
+classes for incremental (de)compression, and convenience functions for
+one-shot (de)compression.
+
+These classes and functions support both the XZ and legacy LZMA
+container formats, as well as raw compressed data streams.
+"""
+
+==========================================================================================
+macpath
+"""Pathname and path-related operations for the Macintosh."""
+
+==========================================================================================
+macurl2path
+"""Macintosh-specific module for conversion between pathnames and URLs.
+
+Do not import directly; use urllib instead."""
+
+==========================================================================================
+mailbox
+"""Read/write support for Maildir, mbox, MH, Babyl, and MMDF mailboxes."""
+
+==========================================================================================
+mailcap
+"""Mailcap file handling.  See RFC 1524."""
+
+==========================================================================================
+mimetypes
+"""Guess the MIME type of a file.
+
+This module defines two useful functions:
+
+guess_type(url, strict=True) -- guess the MIME type and encoding of a URL.
+
+guess_extension(type, strict=True) -- guess the extension for a given MIME type.
+
+It also contains the following, for tuning the behavior:
+
+Data:
+
+knownfiles -- list of files to parse
+inited -- flag set when init() has been called
+suffix_map -- dictionary mapping suffixes to suffixes
+encodings_map -- dictionary mapping suffixes to encodings
+types_map -- dictionary mapping suffixes to types
+
+Functions:
+
+init([files]) -- parse a list of files, default knownfiles (on Windows, the
+  default values are taken from the registry)
+read_mime_types(file) -- parse one file, return a dictionary or None
+"""
+
+==========================================================================================
+modulefinder
+"""Find modules used by a script, using introspection."""
+
+==========================================================================================
+netrc
+"""An object-oriented interface to .netrc files."""
+
+==========================================================================================
+nntplib
+"""An NNTP client class based on:
+- RFC 977: Network News Transfer Protocol
+- RFC 2980: Common NNTP Extensions
+- RFC 3977: Network News Transfer Protocol (version 2)
+
+Example:
+
+>>> from nntplib import NNTP
+>>> s = NNTP('news')
+>>> resp, count, first, last, name = s.group('comp.lang.python')
+>>> print('Group', name, 'has', count, 'articles, range', first, 'to', last)
+Group comp.lang.python has 51 articles, range 5770 to 5821
+>>> resp, subs = s.xhdr('subject', '{0}-{1}'.format(first, last))
+>>> resp = s.quit()
+>>>
+
+Here 'resp' is the server response line.
+Error responses are turned into exceptions.
+
+To post an article from a file:
+>>> f = open(filename, 'rb') # file containing article, including header
+>>> resp = s.post(f)
+>>>
+
+For descriptions of all methods, read the comments in the code below.
+Note that all arguments and return values representing article numbers
+are strings, not numbers, since they are rarely used for calculations.
+"""
+
+==========================================================================================
+ntpath
+"""Common pathname manipulations, WindowsNT/95 version.
+
+Instead of importing this module directly, import os and refer to this
+module as os.path.
+"""
+
+==========================================================================================
+nturl2path
+"""Convert a NT pathname to a file URL and vice versa."""
+
+==========================================================================================
+numbers
+"""Abstract Base Classes (ABCs) for numbers, according to PEP 3141.
+
+TODO: Fill out more detailed documentation on the operators."""
+
+==========================================================================================
+opcode
+"""
+
+==========================================================================================
+operator
+"""
+
+==========================================================================================
+optparse
+"""A powerful, extensible, and easy-to-use option parser.
+
+By Greg Ward <gward@python.net>
+
+Originally distributed as Optik.
+
+For support, use the optik-users@lists.sourceforge.net mailing list
+(http://lists.sourceforge.net/lists/listinfo/optik-users).
+
+Simple usage example:
+
+   from optparse import OptionParser
+
+   parser = OptionParser()
+   parser.add_option("-f", "--file", dest="filename",
+                     help="write report to FILE", metavar="FILE")
+   parser.add_option("-q", "--quiet",
+                     action="store_false", dest="verbose", default=True,
+                     help="don't print status messages to stdout")
+
+   (options, args) = parser.parse_args()
+"""
+
+==========================================================================================
+os
+r"""OS routines for NT or Posix depending on what system we're on.
+
+This exports:
+  - all functions from posix or nt, e.g. unlink, stat, etc.
+  - os.path is either posixpath or ntpath
+  - os.name is either 'posix' or 'nt'
+  - os.curdir is a string representing the current directory (always '.')
+  - os.pardir is a string representing the parent directory (always '..')
+  - os.sep is the (or a most common) pathname separator ('/' or '\\')
+  - os.extsep is the extension separator (always '.')
+  - os.altsep is the alternate pathname separator (None or '/')
+  - os.pathsep is the component separator used in $PATH etc
+  - os.linesep is the line separator in text files ('\r' or '\n' or '\r\n')
+  - os.defpath is the default search path for executables
+  - os.devnull is the file path of the null device ('/dev/null', etc.)
+
+Programs that import and use 'os' stand a better chance of being
+portable between different platforms.  Of course, they must then
+only use functions that are defined by all platforms (e.g., unlink
+and opendir), and leave all pathname manipulation to os.path
+(e.g., split and join).
+"""
+
+==========================================================================================
+pdb
+"""
+
+==========================================================================================
+pickle
+"""Create portable serialized representations of Python objects.
+
+See module copyreg for a mechanism for registering custom picklers.
+See module pickletools source for extensive comments.
+
+Classes:
+
+    Pickler
+    Unpickler
+
+Functions:
+
+    dump(object, file)
+    dumps(object) -> string
+    load(file) -> object
+    loads(string) -> object
+
+Misc variables:
+
+    __version__
+    format_version
+    compatible_formats
+
+"""
+
+==========================================================================================
+pickletools
+'''"Executable documentation" for the pickle module.
+
+Extensive comments about the pickle protocols and pickle-machine opcodes
+can be found here.  Some functions meant for external use:
+
+genops(pickle)
+   Generate all the opcodes in a pickle, as (opcode, arg, position) triples.
+
+dis(pickle, out=None, memo=None, indentlevel=4)
+   Print a symbolic disassembly of a pickle.
+'''
+
+==========================================================================================
+pipes
+"""Conversion pipeline templates.
+
+The problem:
+------------
+
+Suppose you have some data that you want to convert to another format,
+such as from GIF image format to PPM image format.  Maybe the
+conversion involves several steps (e.g. piping it through compress or
+uuencode).  Some of the conversion steps may require that their input
+is a disk file, others may be able to read standard input; similar for
+their output.  The input to the entire conversion may also be read
+from a disk file or from an open file, and similar for its output.
+
+The module lets you construct a pipeline template by sticking one or
+more conversion steps together.  It will take care of creating and
+removing temporary files if they are necessary to hold intermediate
+data.  You can then use the template to do conversions from many
+different sources to many different destinations.  The temporary
+file names used are different each time the template is used.
+
+The templates are objects so you can create templates for many
+different conversion steps and store them in a dictionary, for
+instance.
+
+
+Directions:
+-----------
+
+To create a template:
+    t = Template()
+
+To add a conversion step to a template:
+   t.append(command, kind)
+where kind is a string of two characters: the first is '-' if the
+command reads its standard input or 'f' if it requires a file; the
+second likewise for the output. The command must be valid /bin/sh
+syntax.  If input or output files are required, they are passed as
+$IN and $OUT; otherwise, it must be  possible to use the command in
+a pipeline.
+
+To add a conversion step at the beginning:
+   t.prepend(command, kind)
+
+To convert a file to another file using a template:
+  sts = t.copy(infile, outfile)
+If infile or outfile are the empty string, standard input is read or
+standard output is written, respectively.  The return value is the
+exit status of the conversion pipeline.
+
+To open a file for reading or writing through a conversion pipeline:
+   fp = t.open(file, mode)
+where mode is 'r' to read the file, or 'w' to write it -- just like
+for the built-in function open() or for os.popen().
+
+To create a new template object initialized to a given one:
+   t2 = t.clone()
+"""                                     # '
+
+
+import re
+import os
+import tempfile
+from shlex import quote
+
+__all__ = ["Template"]
+
+
+FILEIN_FILEOUT = 'ff'                   # Must read & write real files
+STDIN_FILEOUT  = '-f'                   # Must write a real file
+FILEIN_STDOUT  = 'f-'                   # Must read a real file
+STDIN_STDOUT   = '--'                   # Normal pipeline element
+SOURCE         = '.-'                   # Must be first, writes stdout
+SINK           = '-.'                   # Must be last, reads stdin
+
+stepkinds = [FILEIN_FILEOUT, STDIN_FILEOUT, FILEIN_STDOUT, STDIN_STDOUT, \
+             SOURCE, SINK]
+
+
+class Template:
+    """Class representing a pipeline template."""
+
+==========================================================================================
+pkgutil
+"""Utilities to support packages."""
+
+==========================================================================================
+platform
+""" This module tries to retrieve as much platform-identifying data as
+    possible. It makes this information available via function APIs.
+
+    If called from the command line, it prints the platform
+    information concatenated as single string to stdout. The output
+    format is useable as part of a filename.
+
+"""
+
+==========================================================================================
+plistlib
+r"""plistlib.py -- a tool to generate and parse MacOSX .plist files.
+
+The property list (.plist) file format is a simple XML pickle supporting
+basic object types, like dictionaries, lists, numbers and strings.
+Usually the top level object is a dictionary.
+
+To write out a plist file, use the dump(value, file)
+function. 'value' is the top level object, 'file' is
+a (writable) file object.
+
+To parse a plist from a file, use the load(file) function,
+with a (readable) file object as the only argument. It
+returns the top level object (again, usually a dictionary).
+
+To work with plist data in bytes objects, you can use loads()
+and dumps().
+
+Values can be strings, integers, floats, booleans, tuples, lists,
+dictionaries (but only with string keys), Data, bytes, bytearray, or
+datetime.datetime objects.
+
+Generate Plist example:
+
+    pl = dict(
+        aString = "Doodah",
+        aList = ["A", "B", 12, 32.1, [1, 2, 3]],
+        aFloat = 0.1,
+        anInt = 728,
+        aDict = dict(
+            anotherString = "<hello & hi there!>",
+            aUnicodeValue = "M\xe4ssig, Ma\xdf",
+            aTrueValue = True,
+            aFalseValue = False,
+        ),
+        someData = b"<binary gunk>",
+        someMoreData = b"<lots of binary gunk>" * 10,
+        aDate = datetime.datetime.fromtimestamp(time.mktime(time.gmtime())),
+    )
+    with open(fileName, 'wb') as fp:
+        dump(pl, fp)
+
+Parse Plist example:
+
+    with open(fileName, 'rb') as fp:
+        pl = load(fp)
+    print(pl["aKey"])
+"""
+
+==========================================================================================
+poplib
+"""A POP3 client class.
+
+Based on the J. Myers POP3 draft, Jan. 96
+"""
+
+==========================================================================================
+posixpath
+"""Common operations on Posix pathnames.
+
+Instead of importing this module directly, import os and refer to
+this module as os.path.  The "os.path" name is an alias for this
+module on Posix systems; on other systems (e.g. Mac, Windows),
+os.path provides the same operations in a manner specific to that
+platform, and is an alias to another module (e.g. macpath, ntpath).
+
+Some of this can actually be useful on non-Posix systems too, e.g.
+for manipulation of the pathname component of URLs.
+"""
+
+==========================================================================================
+pprint
+"""Support to pretty-print lists, tuples, & dictionaries recursively.
+
+Very simple, but useful, especially in debugging data structures.
+
+Classes
+-------
+
+PrettyPrinter()
+    Handle pretty-printing operations onto a stream using a configured
+    set of formatting parameters.
+
+Functions
+---------
+
+pformat()
+    Format a Python object into a pretty-printed representation.
+
+pprint()
+    Pretty-print a Python object to a stream [default is sys.stdout].
+
+saferepr()
+    Generate a 'standard' repr()-like value, but protect against recursive
+    data structures.
+
+"""
+
+==========================================================================================
+profile
+"""Class for profiling Python code."""
+
+==========================================================================================
+pstats
+"""Class for printing reports on profiled python code."""
+
+==========================================================================================
+pty
+"""Pseudo terminal utilities."""
+
+==========================================================================================
+pyclbr
+"""Parse a Python module and describe its classes and methods.
+
+Parse enough of a Python file to recognize imports and class and
+method definitions, and to find out the superclasses of a class.
+
+The interface consists of a single function:
+        readmodule_ex(module [, path])
+where module is the name of a Python module, and path is an optional
+list of directories where the module is to be searched.  If present,
+path is prepended to the system search path sys.path.  The return
+value is a dictionary.  The keys of the dictionary are the names of
+the classes defined in the module (including classes that are defined
+via the from XXX import YYY construct).  The values are class
+instances of the class Class defined here.  One special key/value pair
+is present for packages: the key '__path__' has a list as its value
+which contains the package search path.
+
+A class is described by the class Class in this module.  Instances
+of this class have the following instance variables:
+        module -- the module name
+        name -- the name of the class
+        super -- a list of super classes (Class instances)
+        methods -- a dictionary of methods
+        file -- the file in which the class was defined
+        lineno -- the line in the file on which the class statement occurred
+The dictionary of methods uses the method names as keys and the line
+numbers on which the method was defined as values.
+If the name of a super class is not recognized, the corresponding
+entry in the list of super classes is not a class instance but a
+string giving the name of the super class.  Since import statements
+are recognized and imported modules are scanned as well, this
+shouldn't happen often.
+
+A function is described by the class Function in this module.
+Instances of this class have the following instance variables:
+        module -- the module name
+        name -- the name of the class
+        file -- the file in which the class was defined
+        lineno -- the line in the file on which the class statement occurred
+"""
+
+==========================================================================================
+pydoc
+"""Generate Python documentation in HTML or text for interactive use.
+
+At the Python interactive prompt, calling help(thing) on a Python object
+documents the object, and calling help() starts up an interactive
+help session.
+
+Or, at the shell command line outside of Python:
+
+Run "pydoc <name>" to show documentation on something.  <name> may be
+the name of a function, module, package, or a dotted reference to a
+class or function within a module or module in a package.  If the
+argument contains a path segment delimiter (e.g. slash on Unix,
+backslash on Windows) it is treated as the path to a Python source file.
+
+Run "pydoc -k <keyword>" to search for a keyword in the synopsis lines
+of all available modules.
+
+Run "pydoc -p <port>" to start an HTTP server on the given port on the
+local machine.  Port number 0 can be used to get an arbitrary unused port.
+
+Run "pydoc -b" to start an HTTP server on an arbitrary unused port and
+open a Web browser to interactively browse documentation.  The -p option
+can be used with the -b option to explicitly specify the server port.
+
+Run "pydoc -w <name>" to write out the HTML documentation for a module
+to a file named "<name>.html".
+
+Module docs for core modules are assumed to be in
+
+    https://docs.python.org/X.Y/library/
+
+This can be overridden by setting the PYTHONDOCS environment variable
+to a different URL or to a local directory containing the Library
+Reference Manual pages.
+"""
+
+==========================================================================================
+py_compile
+"""Routine to "compile" a .py file to a .pyc file.
+
+This module has intimate knowledge of the format of .pyc files.
+"""
+
+==========================================================================================
+queue
+'''A multi-producer, multi-consumer queue.'''
+
+==========================================================================================
+quopri
+"""Conversions to/from quoted-printable transport encoding as per RFC 1521."""
+
+==========================================================================================
+random
+"""Random variable generators.
+
+    integers
+    --------
+           uniform within range
+
+    sequences
+    ---------
+           pick random element
+           pick random sample
+           pick weighted random sample
+           generate random permutation
+
+    distributions on the real line:
+    ------------------------------
+           uniform
+           triangular
+           normal (Gaussian)
+           lognormal
+           negative exponential
+           gamma
+           beta
+           pareto
+           Weibull
+
+    distributions on the circle (angles 0 to 2pi)
+    ---------------------------------------------
+           circular uniform
+           von Mises
+
+General notes on the underlying Mersenne Twister core generator:
+
+* The period is 2**19937-1.
+* It is one of the most extensively tested generators in existence.
+* The random() method is implemented in C, executes in a single Python step,
+  and is, therefore, threadsafe.
+
+"""
+
+==========================================================================================
+re
+r"""Support for regular expressions (RE).
+
+This module provides regular expression matching operations similar to
+those found in Perl.  It supports both 8-bit and Unicode strings; both
+the pattern and the strings being processed can contain null bytes and
+characters outside the US ASCII range.
+
+Regular expressions can contain both special and ordinary characters.
+Most ordinary characters, like "A", "a", or "0", are the simplest
+regular expressions; they simply match themselves.  You can
+concatenate ordinary characters, so last matches the string 'last'.
+
+The special characters are:
+    "."      Matches any character except a newline.
+    "^"      Matches the start of the string.
+    "$"      Matches the end of the string or just before the newline at
+             the end of the string.
+    "*"      Matches 0 or more (greedy) repetitions of the preceding RE.
+             Greedy means that it will match as many repetitions as possible.
+    "+"      Matches 1 or more (greedy) repetitions of the preceding RE.
+    "?"      Matches 0 or 1 (greedy) of the preceding RE.
+    *?,+?,?? Non-greedy versions of the previous three special characters.
+    {m,n}    Matches from m to n repetitions of the preceding RE.
+    {m,n}?   Non-greedy version of the above.
+    "\\"     Either escapes special characters or signals a special sequence.
+    []       Indicates a set of characters.
+             A "^" as the first character indicates a complementing set.
+    "|"      A|B, creates an RE that will match either A or B.
+    (...)    Matches the RE inside the parentheses.
+             The contents can be retrieved or matched later in the string.
+    (?aiLmsux) Set the A, I, L, M, S, U, or X flag for the RE (see below).
+    (?:...)  Non-grouping version of regular parentheses.
+    (?P<name>...) The substring matched by the group is accessible by name.
+    (?P=name)     Matches the text matched earlier by the group named name.
+    (?#...)  A comment; ignored.
+    (?=...)  Matches if ... matches next, but doesn't consume the string.
+    (?!...)  Matches if ... doesn't match next.
+    (?<=...) Matches if preceded by ... (must be fixed length).
+    (?<!...) Matches if not preceded by ... (must be fixed length).
+    (?(id/name)yes|no) Matches yes pattern if the group with id/name matched,
+                       the (optional) no pattern otherwise.
+
+The special sequences consist of "\\" and a character from the list
+below.  If the ordinary character is not on the list, then the
+resulting RE will match the second character.
+    \number  Matches the contents of the group of the same number.
+    \A       Matches only at the start of the string.
+    \Z       Matches only at the end of the string.
+    \b       Matches the empty string, but only at the start or end of a word.
+    \B       Matches the empty string, but not at the start or end of a word.
+    \d       Matches any decimal digit; equivalent to the set [0-9] in
+             bytes patterns or string patterns with the ASCII flag.
+             In string patterns without the ASCII flag, it will match the whole
+             range of Unicode digits.
+    \D       Matches any non-digit character; equivalent to [^\d].
+    \s       Matches any whitespace character; equivalent to [ \t\n\r\f\v] in
+             bytes patterns or string patterns with the ASCII flag.
+             In string patterns without the ASCII flag, it will match the whole
+             range of Unicode whitespace characters.
+    \S       Matches any non-whitespace character; equivalent to [^\s].
+    \w       Matches any alphanumeric character; equivalent to [a-zA-Z0-9_]
+             in bytes patterns or string patterns with the ASCII flag.
+             In string patterns without the ASCII flag, it will match the
+             range of Unicode alphanumeric characters (letters plus digits
+             plus underscore).
+             With LOCALE, it will match the set [0-9_] plus characters defined
+             as letters for the current locale.
+    \W       Matches the complement of \w.
+    \\       Matches a literal backslash.
+
+This module exports the following functions:
+    match     Match a regular expression pattern to the beginning of a string.
+    fullmatch Match a regular expression pattern to all of a string.
+    search    Search a string for the presence of a pattern.
+    sub       Substitute occurrences of a pattern found in a string.
+    subn      Same as sub, but also return the number of substitutions made.
+    split     Split a string by the occurrences of a pattern.
+    findall   Find all occurrences of a pattern in a string.
+    finditer  Return an iterator yielding a match object for each match.
+    compile   Compile a pattern into a RegexObject.
+    purge     Clear the regular expression cache.
+    escape    Backslash all non-alphanumerics in a string.
+
+Some of the functions in this module takes flags as optional parameters:
+    A  ASCII       For string patterns, make \w, \W, \b, \B, \d, \D
+                   match the corresponding ASCII character categories
+                   (rather than the whole Unicode categories, which is the
+                   default).
+                   For bytes patterns, this flag is the only available
+                   behaviour and needn't be specified.
+    I  IGNORECASE  Perform case-insensitive matching.
+    L  LOCALE      Make \w, \W, \b, \B, dependent on the current locale.
+    M  MULTILINE   "^" matches the beginning of lines (after a newline)
+                   as well as the string.
+                   "$" matches the end of lines (before a newline) as well
+                   as the end of the string.
+    S  DOTALL      "." matches any character at all, including the newline.
+    X  VERBOSE     Ignore whitespace and comments for nicer looking RE's.
+    U  UNICODE     For compatibility only. Ignored for string patterns (it
+                   is the default), and forbidden for bytes patterns.
+
+This module also defines an exception 'error'.
+
+"""
+
+==========================================================================================
+reprlib
+"""Redo the builtin repr() (representation) but with limits on most sizes."""
+
+==========================================================================================
+rlcompleter
+"""Word completion for GNU readline.
+
+The completer completes keywords, built-ins and globals in a selectable
+namespace (which defaults to __main__); when completing NAME.NAME..., it
+evaluates (!) the expression up to the last dot and completes its attributes.
+
+It's very cool to do "import sys" type "sys.", hit the completion key (twice),
+and see the list of names defined by the sys module!
+
+Tip: to use the tab key as the completion key, call
+
+    readline.parse_and_bind("tab: complete")
+
+Notes:
+
+- Exceptions raised by the completer function are *ignored* (and generally cause
+  the completion to fail).  This is a feature -- since readline sets the tty
+  device in raw (or cbreak) mode, printing a traceback wouldn't work well
+  without some complicated hoopla to save, reset and restore the tty state.
+
+- The evaluation of the NAME.NAME... form may cause arbitrary application
+  defined code to be executed if an object with a __getattr__ hook is found.
+  Since it is the responsibility of the application (or the user) to enable this
+  feature, I consider this an acceptable risk.  More complicated expressions
+  (e.g. function calls or indexing operations) are *not* evaluated.
+
+- When the original stdin is not a tty device, GNU readline is never
+  used, and this module (and the readline module) are silently inactive.
+
+"""
+
+==========================================================================================
+runpy
+"""runpy.py - locating and running Python code using the module namespace
+
+Provides support for locating and running Python scripts using the Python
+module namespace instead of the native filesystem.
+
+This allows Python code to play nicely with non-filesystem based PEP 302
+importers when locating support scripts as well as when importing modules.
+"""
+
+==========================================================================================
+sched
+"""A generally useful event scheduler class.
+
+Each instance of this class manages its own queue.
+No multi-threading is implied; you are supposed to hack that
+yourself, or use a single instance per application.
+
+Each instance is parametrized with two functions, one that is
+supposed to return the current time, one that is supposed to
+implement a delay.  You can implement real-time scheduling by
+substituting time and sleep from built-in module time, or you can
+implement simulated time by writing your own functions.  This can
+also be used to integrate scheduling with STDWIN events; the delay
+function is allowed to modify the queue.  Time can be expressed as
+integers or floating point numbers, as long as it is consistent.
+
+Events are specified by tuples (time, priority, action, argument, kwargs).
+As in UNIX, lower priority numbers mean higher priority; in this
+way the queue can be maintained as a priority queue.  Execution of the
+event means calling the action function, passing it the argument
+sequence in "argument" (remember that in Python, multiple function
+arguments are be packed in a sequence) and keyword parameters in "kwargs".
+The action function may be an instance method so it
+has another way to reference private data (besides global variables).
+"""
+
+==========================================================================================
+secrets
+"""Generate cryptographically strong pseudo-random numbers suitable for
+managing secrets such as account authentication, tokens, and similar.
+
+See PEP 506 for more information.
+https://www.python.org/dev/peps/pep-0506/
+
+"""
+
+==========================================================================================
+selectors
+"""Selectors module.
+
+This module allows high-level and efficient I/O multiplexing, built upon the
+`select` module primitives.
+"""
+
+==========================================================================================
+shelve
+"""Manage shelves of pickled objects.
+
+A "shelf" is a persistent, dictionary-like object.  The difference
+with dbm databases is that the values (not the keys!) in a shelf can
+be essentially arbitrary Python objects -- anything that the "pickle"
+module can handle.  This includes most class instances, recursive data
+types, and objects containing lots of shared sub-objects.  The keys
+are ordinary strings.
+
+To summarize the interface (key is a string, data is an arbitrary
+object):
+
+        import shelve
+        d = shelve.open(filename) # open, with (g)dbm filename -- no suffix
+
+        d[key] = data   # store data at key (overwrites old data if
+                        # using an existing key)
+        data = d[key]   # retrieve a COPY of the data at key (raise
+                        # KeyError if no such key) -- NOTE that this
+                        # access returns a *copy* of the entry!
+        del d[key]      # delete data stored at key (raises KeyError
+                        # if no such key)
+        flag = key in d # true if the key exists
+        list = d.keys() # a list of all existing keys (slow!)
+
+        d.close()       # close it
+
+Dependent on the implementation, closing a persistent dictionary may
+or may not be necessary to flush changes to disk.
+
+Normally, d[key] returns a COPY of the entry.  This needs care when
+mutable entries are mutated: for example, if d[key] is a list,
+        d[key].append(anitem)
+does NOT modify the entry d[key] itself, as stored in the persistent
+mapping -- it only modifies the copy, which is then immediately
+discarded, so that the append has NO effect whatsoever.  To append an
+item to d[key] in a way that will affect the persistent mapping, use:
+        data = d[key]
+        data.append(anitem)
+        d[key] = data
+
+To avoid the problem with mutable entries, you may pass the keyword
+argument writeback=True in the call to shelve.open.  When you use:
+        d = shelve.open(filename, writeback=True)
+then d keeps a cache of all entries you access, and writes them all back
+to the persistent mapping when you call d.close().  This ensures that
+such usage as d[key].append(anitem) works as intended.
+
+However, using keyword argument writeback=True may consume vast amount
+of memory for the cache, and it may make d.close() very slow, if you
+access many of d's entries after opening it in this way: d has no way to
+check which of the entries you access are mutable and/or which ones you
+actually mutate, so it must cache, and write back at close, all of the
+entries that you access.  You can call d.sync() to write back all the
+entries in the cache, and empty the cache (d.sync() also synchronizes
+the persistent dictionary on disk, if feasible).
+"""
+
+==========================================================================================
+shlex
+"""A lexical analyzer class for simple shell-like syntaxes."""
+
+==========================================================================================
+shutil
+"""Utility functions for copying and archiving files and directory trees.
+
+XXX The functions here don't copy the resource fork or other metadata on Mac.
+
+"""
+
+==========================================================================================
+site
+"""Append module search paths for third-party packages to sys.path.
+
+****************************************************************
+* This module is automatically imported during initialization. *
+****************************************************************
+
+This will append site-specific paths to the module search path.  On
+Unix (including Mac OSX), it starts with sys.prefix and
+sys.exec_prefix (if different) and appends
+lib/python<version>/site-packages.
+On other platforms (such as Windows), it tries each of the
+prefixes directly, as well as with lib/site-packages appended.  The
+resulting directories, if they exist, are appended to sys.path, and
+also inspected for path configuration files.
+
+If a file named "pyvenv.cfg" exists one directory above sys.executable,
+sys.prefix and sys.exec_prefix are set to that directory and
+it is also checked for site-packages (sys.base_prefix and
+sys.base_exec_prefix will always be the "real" prefixes of the Python
+installation). If "pyvenv.cfg" (a bootstrap configuration file) contains
+the key "include-system-site-packages" set to anything other than "false"
+(case-insensitive), the system-level prefixes will still also be
+searched for site-packages; otherwise they won't.
+
+All of the resulting site-specific directories, if they exist, are
+appended to sys.path, and also inspected for path configuration
+files.
+
+A path configuration file is a file whose name has the form
+<package>.pth; its contents are additional directories (one per line)
+to be added to sys.path.  Non-existing directories (or
+non-directories) are never added to sys.path; no directory is added to
+sys.path more than once.  Blank lines and lines beginning with
+'#' are skipped. Lines starting with 'import' are executed.
+
+For example, suppose sys.prefix and sys.exec_prefix are set to
+/usr/local and there is a directory /usr/local/lib/python2.5/site-packages
+with three subdirectories, foo, bar and spam, and two path
+configuration files, foo.pth and bar.pth.  Assume foo.pth contains the
+following:
+
+  # foo package configuration
+  foo
+  bar
+  bletch
+
+and bar.pth contains:
+
+  # bar package configuration
+  bar
+
+Then the following directories are added to sys.path, in this order:
+
+  /usr/local/lib/python2.5/site-packages/bar
+  /usr/local/lib/python2.5/site-packages/foo
+
+Note that bletch is omitted because it doesn't exist; bar precedes foo
+because bar.pth comes alphabetically before foo.pth; and spam is
+omitted because it is not mentioned in either path configuration file.
+
+The readline module is also automatically configured to enable
+completion for systems that support it.  This can be overridden in
+sitecustomize, usercustomize or PYTHONSTARTUP.  Starting Python in
+isolated mode (-I) disables automatic readline configuration.
+
+After these operations, an attempt is made to import a module
+named sitecustomize, which can perform arbitrary additional
+site-specific customizations.  If this import fails with an
+ImportError exception, it is silently ignored.
+"""
+
+==========================================================================================
+smtpd
+"""An RFC 5321 smtp proxy with optional RFC 1870 and RFC 6531 extensions.
+
+Usage: %(program)s [options] [localhost:localport [remotehost:remoteport]]
+
+Options:
+
+    --nosetuid
+    -n
+        This program generally tries to setuid `nobody', unless this flag is
+        set.  The setuid call will fail if this program is not run as root (in
+        which case, use this flag).
+
+    --version
+    -V
+        Print the version number and exit.
+
+    --class classname
+    -c classname
+        Use `classname' as the concrete SMTP proxy class.  Uses `PureProxy' by
+        default.
+
+    --size limit
+    -s limit
+        Restrict the total size of the incoming message to "limit" number of
+        bytes via the RFC 1870 SIZE extension.  Defaults to 33554432 bytes.
+
+    --smtputf8
+    -u
+        Enable the SMTPUTF8 extension and behave as an RFC 6531 smtp proxy.
+
+    --debug
+    -d
+        Turn on debugging prints.
+
+    --help
+    -h
+        Print this message and exit.
+
+Version: %(__version__)s
+
+If localhost is not given then `localhost' is used, and if localport is not
+given then 8025 is used.  If remotehost is not given then `localhost' is used,
+and if remoteport is not given, then 25 is used.
+"""
+
+==========================================================================================
+smtplib
+'''SMTP/ESMTP client class.
+
+This should follow RFC 821 (SMTP), RFC 1869 (ESMTP), RFC 2554 (SMTP
+Authentication) and RFC 2487 (Secure SMTP over TLS).
+
+Notes:
+
+Please remember, when doing ESMTP, that the names of the SMTP service
+extensions are NOT the same thing as the option keywords for the RCPT
+and MAIL commands!
+
+Example:
+
+  >>> import smtplib
+  >>> s=smtplib.SMTP("localhost")
+  >>> print(s.help())
+  This is Sendmail version 8.8.4
+  Topics:
+      HELO    EHLO    MAIL    RCPT    DATA
+      RSET    NOOP    QUIT    HELP    VRFY
+      EXPN    VERB    ETRN    DSN
+  For more info use "HELP <topic>".
+  To report bugs in the implementation send email to
+      sendmail-bugs@sendmail.org.
+  For local information send email to Postmaster at your site.
+  End of HELP info
+  >>> s.putcmd("vrfy","someone@here")
+  >>> s.getreply()
+  (250, "Somebody OverHere <somebody@here.my.org>")
+  >>> s.quit()
+'''
+
+==========================================================================================
+sndhdr
+"""Routines to help recognizing sound files.
+
+Function whathdr() recognizes various types of sound file headers.
+It understands almost all headers that SOX can decode.
+
+The return tuple contains the following items, in this order:
+- file type (as SOX understands it)
+- sampling rate (0 if unknown or hard to decode)
+- number of channels (0 if unknown or hard to decode)
+- number of frames in the file (-1 if unknown or hard to decode)
+- number of bits/sample, or 'U' for U-LAW, or 'A' for A-LAW
+
+If the file doesn't have a recognizable type, it returns None.
+If the file can't be opened, OSError is raised.
+
+To compute the total time, divide the number of frames by the
+sampling rate (a frame contains a sample for each channel).
+
+Function what() calls whathdr().  (It used to also use some
+heuristics for raw data, but this doesn't work very well.)
+
+Finally, the function test() is a simple main program that calls
+what() for all files mentioned on the argument list.  For directory
+arguments it calls what() for all files in that directory.  Default
+argument is "." (testing all files in the current directory).  The
+option -r tells it to recurse down directories found inside
+explicitly given directories.
+"""
+
+==========================================================================================
+socket
+"""\
+This module provides socket operations and some related functions.
+On Unix, it supports IP (Internet Protocol) and Unix domain sockets.
+On other systems, it only supports IP. Functions specific for a
+socket are available as methods of the socket object.
+
+Functions:
+
+socket() -- create a new socket object
+socketpair() -- create a pair of new socket objects [*]
+fromfd() -- create a socket object from an open file descriptor [*]
+fromshare() -- create a socket object from data received from socket.share() [*]
+gethostname() -- return the current hostname
+gethostbyname() -- map a hostname to its IP number
+gethostbyaddr() -- map an IP number or hostname to DNS info
+getservbyname() -- map a service name and a protocol name to a port number
+getprotobyname() -- map a protocol name (e.g. 'tcp') to a number
+ntohs(), ntohl() -- convert 16, 32 bit int from network to host byte order
+htons(), htonl() -- convert 16, 32 bit int from host to network byte order
+inet_aton() -- convert IP addr string (123.45.67.89) to 32-bit packed format
+inet_ntoa() -- convert 32-bit packed format IP to string (123.45.67.89)
+socket.getdefaulttimeout() -- get the default timeout value
+socket.setdefaulttimeout() -- set the default timeout value
+create_connection() -- connects to an address, with an optional timeout and
+                       optional source address.
+
+ [*] not available on all platforms!
+
+Special objects:
+
+SocketType -- type object for socket objects
+error -- exception raised for I/O errors
+has_ipv6 -- boolean value indicating if IPv6 is supported
+
+IntEnum constants:
+
+AF_INET, AF_UNIX -- socket domains (first argument to socket() call)
+SOCK_STREAM, SOCK_DGRAM, SOCK_RAW -- socket types (second argument)
+
+Integer constants:
+
+Many other constants may be defined; these may be used in calls to
+the setsockopt() and getsockopt() methods.
+"""
+
+==========================================================================================
+socketserver
+"""Generic socket server classes.
+
+This module tries to capture the various aspects of defining a server:
+
+For socket-based servers:
+
+- address family:
+        - AF_INET{,6}: IP (Internet Protocol) sockets (default)
+        - AF_UNIX: Unix domain sockets
+        - others, e.g. AF_DECNET are conceivable (see <socket.h>
+- socket type:
+        - SOCK_STREAM (reliable stream, e.g. TCP)
+        - SOCK_DGRAM (datagrams, e.g. UDP)
+
+For request-based servers (including socket-based):
+
+- client address verification before further looking at the request
+        (This is actually a hook for any processing that needs to look
+         at the request before anything else, e.g. logging)
+- how to handle multiple requests:
+        - synchronous (one request is handled at a time)
+        - forking (each request is handled by a new process)
+        - threading (each request is handled by a new thread)
+
+The classes in this module favor the server type that is simplest to
+write: a synchronous TCP/IP server.  This is bad class design, but
+save some typing.  (There's also the issue that a deep class hierarchy
+slows down method lookups.)
+
+There are five classes in an inheritance diagram, four of which represent
+synchronous servers of four types:
+
+        +------------+
+        | BaseServer |
+        +------------+
+              |
+              v
+        +-----------+        +------------------+
+        | TCPServer |------->| UnixStreamServer |
+        +-----------+        +------------------+
+              |
+              v
+        +-----------+        +--------------------+
+        | UDPServer |------->| UnixDatagramServer |
+        +-----------+        +--------------------+
+
+Note that UnixDatagramServer derives from UDPServer, not from
+UnixStreamServer -- the only difference between an IP and a Unix
+stream server is the address family, which is simply repeated in both
+unix server classes.
+
+Forking and threading versions of each type of server can be created
+using the ForkingMixIn and ThreadingMixIn mix-in classes.  For
+instance, a threading UDP server class is created as follows:
+
+        class ThreadingUDPServer(ThreadingMixIn, UDPServer): pass
+
+The Mix-in class must come first, since it overrides a method defined
+in UDPServer! Setting the various member variables also changes
+the behavior of the underlying server mechanism.
+
+To implement a service, you must derive a class from
+BaseRequestHandler and redefine its handle() method.  You can then run
+various versions of the service by combining one of the server classes
+with your request handler class.
+
+The request handler class must be different for datagram or stream
+services.  This can be hidden by using the request handler
+subclasses StreamRequestHandler or DatagramRequestHandler.
+
+Of course, you still have to use your head!
+
+For instance, it makes no sense to use a forking server if the service
+contains state in memory that can be modified by requests (since the
+modifications in the child process would never reach the initial state
+kept in the parent process and passed to each child).  In this case,
+you can use a threading server, but you will probably have to use
+locks to avoid two requests that come in nearly simultaneous to apply
+conflicting changes to the server state.
+
+On the other hand, if you are building e.g. an HTTP server, where all
+data is stored externally (e.g. in the file system), a synchronous
+class will essentially render the service "deaf" while one request is
+being handled -- which may be for a very long time if a client is slow
+to read all the data it has requested.  Here a threading or forking
+server is appropriate.
+
+In some cases, it may be appropriate to process part of a request
+synchronously, but to finish processing in a forked child depending on
+the request data.  This can be implemented by using a synchronous
+server and doing an explicit fork in the request handler class
+handle() method.
+
+Another approach to handling multiple simultaneous requests in an
+environment that supports neither threads nor fork (or where these are
+too expensive or inappropriate for the service) is to maintain an
+explicit table of partially finished requests and to use a selector to
+decide which request to work on next (or whether to handle a new
+incoming request).  This is particularly important for stream services
+where each client can potentially be connected for a long time (if
+threads or subprocesses cannot be used).
+
+Future work:
+- Standard classes for Sun RPC (which uses either UDP or TCP)
+- Standard mix-in classes to implement various authentication
+  and encryption schemes
+
+XXX Open problems:
+- What to do with out-of-band data?
+
+BaseServer:
+- split generic "request" functionality out into BaseServer class.
+  Copyright (C) 2000  Luke Kenneth Casson Leighton <lkcl@samba.org>
+
+  example: read entries from a SQL database (requires overriding
+  get_request() to return a table entry from the database).
+  entry is processed by a RequestHandlerClass.
+
+"""
+
+==========================================================================================
+sre_compile
+"""Internal support module for sre"""
+
+==========================================================================================
+sre_constants
+"""Internal support module for sre"""
+
+==========================================================================================
+sre_parse
+"""Internal support module for sre"""
+
+==========================================================================================
+ssl
+"""This module provides some more Pythonic support for SSL.
+
+Object types:
+
+  SSLSocket -- subtype of socket.socket which does SSL over the socket
+
+Exceptions:
+
+  SSLError -- exception raised for I/O errors
+
+Functions:
+
+  cert_time_to_seconds -- convert time string used for certificate
+                          notBefore and notAfter functions to integer
+                          seconds past the Epoch (the time values
+                          returned from time.time())
+
+  fetch_server_certificate (HOST, PORT) -- fetch the certificate provided
+                          by the server running on HOST at port PORT.  No
+                          validation of the certificate is performed.
+
+Integer constants:
+
+SSL_ERROR_ZERO_RETURN
+SSL_ERROR_WANT_READ
+SSL_ERROR_WANT_WRITE
+SSL_ERROR_WANT_X509_LOOKUP
+SSL_ERROR_SYSCALL
+SSL_ERROR_SSL
+SSL_ERROR_WANT_CONNECT
+
+SSL_ERROR_EOF
+SSL_ERROR_INVALID_ERROR_CODE
+
+The following group define certificate requirements that one side is
+allowing/requiring from the other side:
+
+CERT_NONE - no certificates from the other side are required (or will
+            be looked at if provided)
+CERT_OPTIONAL - certificates are not required, but if provided will be
+                validated, and if validation fails, the connection will
+                also fail
+CERT_REQUIRED - certificates are required, and will be validated, and
+                if validation fails, the connection will also fail
+
+The following constants identify various SSL protocol variants:
+
+PROTOCOL_SSLv2
+PROTOCOL_SSLv3
+PROTOCOL_SSLv23
+PROTOCOL_TLS
+PROTOCOL_TLS_CLIENT
+PROTOCOL_TLS_SERVER
+PROTOCOL_TLSv1
+PROTOCOL_TLSv1_1
+PROTOCOL_TLSv1_2
+
+The following constants identify various SSL alert message descriptions as per
+http://www.iana.org/assignments/tls-parameters/tls-parameters.xml#tls-parameters-6
+
+ALERT_DESCRIPTION_CLOSE_NOTIFY
+ALERT_DESCRIPTION_UNEXPECTED_MESSAGE
+ALERT_DESCRIPTION_BAD_RECORD_MAC
+ALERT_DESCRIPTION_RECORD_OVERFLOW
+ALERT_DESCRIPTION_DECOMPRESSION_FAILURE
+ALERT_DESCRIPTION_HANDSHAKE_FAILURE
+ALERT_DESCRIPTION_BAD_CERTIFICATE
+ALERT_DESCRIPTION_UNSUPPORTED_CERTIFICATE
+ALERT_DESCRIPTION_CERTIFICATE_REVOKED
+ALERT_DESCRIPTION_CERTIFICATE_EXPIRED
+ALERT_DESCRIPTION_CERTIFICATE_UNKNOWN
+ALERT_DESCRIPTION_ILLEGAL_PARAMETER
+ALERT_DESCRIPTION_UNKNOWN_CA
+ALERT_DESCRIPTION_ACCESS_DENIED
+ALERT_DESCRIPTION_DECODE_ERROR
+ALERT_DESCRIPTION_DECRYPT_ERROR
+ALERT_DESCRIPTION_PROTOCOL_VERSION
+ALERT_DESCRIPTION_INSUFFICIENT_SECURITY
+ALERT_DESCRIPTION_INTERNAL_ERROR
+ALERT_DESCRIPTION_USER_CANCELLED
+ALERT_DESCRIPTION_NO_RENEGOTIATION
+ALERT_DESCRIPTION_UNSUPPORTED_EXTENSION
+ALERT_DESCRIPTION_CERTIFICATE_UNOBTAINABLE
+ALERT_DESCRIPTION_UNRECOGNIZED_NAME
+ALERT_DESCRIPTION_BAD_CERTIFICATE_STATUS_RESPONSE
+ALERT_DESCRIPTION_BAD_CERTIFICATE_HASH_VALUE
+ALERT_DESCRIPTION_UNKNOWN_PSK_IDENTITY
+"""
+
+==========================================================================================
+stat
+"""Constants/functions for interpreting results of os.stat() and os.lstat().
+
+Suggested usage: from stat import *
+"""
+
+==========================================================================================
+statistics
+"""
+
+==========================================================================================
+string
+"""A collection of string constants.
+
+Public module variables:
+
+whitespace -- a string containing all ASCII whitespace
+ascii_lowercase -- a string containing all ASCII lowercase letters
+ascii_uppercase -- a string containing all ASCII uppercase letters
+ascii_letters -- a string containing all ASCII letters
+digits -- a string containing all ASCII decimal digits
+hexdigits -- a string containing all ASCII hexadecimal digits
+octdigits -- a string containing all ASCII octal digits
+punctuation -- a string containing all ASCII punctuation characters
+printable -- a string containing all ASCII characters considered printable
+
+"""
+
+==========================================================================================
+stringprep
+"""Library that exposes various tables found in the StringPrep RFC 3454.
+
+There are two kinds of tables: sets, for which a member test is provided,
+and mappings, for which a mapping function is provided.
+"""
+
+==========================================================================================
+subprocess
+r"""Subprocesses with accessible I/O streams
+
+This module allows you to spawn processes, connect to their
+input/output/error pipes, and obtain their return codes.
+
+For a complete description of this module see the Python documentation.
+
+Main API
+========
+run(...): Runs a command, waits for it to complete, then returns a
+          CompletedProcess instance.
+Popen(...): A class for flexibly executing a command in a new process
+
+Constants
+---------
+DEVNULL: Special value that indicates that os.devnull should be used
+PIPE:    Special value that indicates a pipe should be created
+STDOUT:  Special value that indicates that stderr should go to stdout
+
+
+Older API
+=========
+call(...): Runs a command, waits for it to complete, then returns
+    the return code.
+check_call(...): Same as call() but raises CalledProcessError()
+    if return code is not 0
+check_output(...): Same as check_call() but returns the contents of
+    stdout instead of a return code
+getoutput(...): Runs a command in the shell, waits for it to complete,
+    then returns the output
+getstatusoutput(...): Runs a command in the shell, waits for it to complete,
+    then returns a (exitcode, output) tuple
+"""
+
+==========================================================================================
+sunau
+"""Stuff to parse Sun and NeXT audio files.
+
+An audio file consists of a header followed by the data.  The structure
+of the header is as follows.
+
+        +---------------+
+        | magic word    |
+        +---------------+
+        | header size   |
+        +---------------+
+        | data size     |
+        +---------------+
+        | encoding      |
+        +---------------+
+        | sample rate   |
+        +---------------+
+        | # of channels |
+        +---------------+
+        | info          |
+        |               |
+        +---------------+
+
+The magic word consists of the 4 characters '.snd'.  Apart from the
+info field, all header fields are 4 bytes in size.  They are all
+32-bit unsigned integers encoded in big-endian byte order.
+
+The header size really gives the start of the data.
+The data size is the physical size of the data.  From the other
+parameters the number of frames can be calculated.
+The encoding gives the way in which audio samples are encoded.
+Possible values are listed below.
+The info field currently consists of an ASCII string giving a
+human-readable description of the audio file.  The info field is
+padded with NUL bytes to the header size.
+
+Usage.
+
+Reading audio files:
+        f = sunau.open(file, 'r')
+where file is either the name of a file or an open file pointer.
+The open file pointer must have methods read(), seek(), and close().
+When the setpos() and rewind() methods are not used, the seek()
+method is not  necessary.
+
+This returns an instance of a class with the following public methods:
+        getnchannels()  -- returns number of audio channels (1 for
+                           mono, 2 for stereo)
+        getsampwidth()  -- returns sample width in bytes
+        getframerate()  -- returns sampling frequency
+        getnframes()    -- returns number of audio frames
+        getcomptype()   -- returns compression type ('NONE' or 'ULAW')
+        getcompname()   -- returns human-readable version of
+                           compression type ('not compressed' matches 'NONE')
+        getparams()     -- returns a namedtuple consisting of all of the
+                           above in the above order
+        getmarkers()    -- returns None (for compatibility with the
+                           aifc module)
+        getmark(id)     -- raises an error since the mark does not
+                           exist (for compatibility with the aifc module)
+        readframes(n)   -- returns at most n frames of audio
+        rewind()        -- rewind to the beginning of the audio stream
+        setpos(pos)     -- seek to the specified position
+        tell()          -- return the current position
+        close()         -- close the instance (make it unusable)
+The position returned by tell() and the position given to setpos()
+are compatible and have nothing to do with the actual position in the
+file.
+The close() method is called automatically when the class instance
+is destroyed.
+
+Writing audio files:
+        f = sunau.open(file, 'w')
+where file is either the name of a file or an open file pointer.
+The open file pointer must have methods write(), tell(), seek(), and
+close().
+
+This returns an instance of a class with the following public methods:
+        setnchannels(n) -- set the number of channels
+        setsampwidth(n) -- set the sample width
+        setframerate(n) -- set the frame rate
+        setnframes(n)   -- set the number of frames
+        setcomptype(type, name)
+                        -- set the compression type and the
+                           human-readable compression type
+        setparams(tuple)-- set all parameters at once
+        tell()          -- return current position in output file
+        writeframesraw(data)
+                        -- write audio frames without pathing up the
+                           file header
+        writeframes(data)
+                        -- write audio frames and patch up the file header
+        close()         -- patch up the file header and close the
+                           output file
+You should set the parameters before the first writeframesraw or
+writeframes.  The total number of frames does not need to be set,
+but when it is set to the correct value, the header does not have to
+be patched up.
+It is best to first set all parameters, perhaps possibly the
+compression type, and then write audio frames using writeframesraw.
+When all frames have been written, either call writeframes(b'') or
+close() to patch up the sizes in the header.
+The close() method is called automatically when the class instance
+is destroyed.
+"""
+
+==========================================================================================
+symbol
+"""Non-terminal symbols of Python grammar (from "graminit.h")."""
+
+==========================================================================================
+symtable
+"""Interface to the compiler's internal symbol tables"""
+
+==========================================================================================
+sysconfig
+"""Access to Python's configuration information."""
+
+==========================================================================================
+tabnanny
+"""The Tab Nanny despises ambiguous indentation.  She knows no mercy.
+
+tabnanny -- Detection of ambiguous indentation
+
+For the time being this module is intended to be called as a script.
+However it is possible to import it into an IDE and use the function
+check() described below.
+
+Warning: The API provided by this module is likely to change in future
+releases; such changes may not be backward compatible.
+"""
+
+==========================================================================================
+tarfile
+"""Read from and write to tar format archives.
+"""
+
+==========================================================================================
+telnetlib
+r"""TELNET client class.
+
+Based on RFC 854: TELNET Protocol Specification, by J. Postel and
+J. Reynolds
+
+Example:
+
+>>> from telnetlib import Telnet
+>>> tn = Telnet('www.python.org', 79)   # connect to finger port
+>>> tn.write(b'guido\r\n')
+>>> print(tn.read_all())
+Login       Name               TTY         Idle    When    Where
+guido    Guido van Rossum      pts/2        <Dec  2 11:10> snag.cnri.reston..
+
+>>>
+
+Note that read_all() won't read until eof -- it just reads some data
+-- but it guarantees to read at least one byte unless EOF is hit.
+
+It is possible to pass a Telnet object to a selector in order to wait until
+more data is available.  Note that in this case, read_eager() may return b''
+even if there was data on the socket, because the protocol negotiation may have
+eaten the data.  This is why EOFError is needed in some cases to distinguish
+between "no data" and "connection closed" (since the socket also appears ready
+for reading when it is closed).
+
+To do:
+- option negotiation
+- timeout should be intrinsic to the connection object instead of an
+  option on one of the read calls only
+
+"""
+
+==========================================================================================
+tempfile
+"""Temporary files.
+
+This module provides generic, low- and high-level interfaces for
+creating temporary files and directories.  All of the interfaces
+provided by this module can be used without fear of race conditions
+except for 'mktemp'.  'mktemp' is subject to race conditions and
+should not be used; it is provided for backward compatibility only.
+
+The default path names are returned as str.  If you supply bytes as
+input, all return values will be in bytes.  Ex:
+
+    >>> tempfile.mkstemp()
+    (4, '/tmp/tmptpu9nin8')
+    >>> tempfile.mkdtemp(suffix=b'')
+    b'/tmp/tmppbi8f0hy'
+
+This module also provides some data items to the user:
+
+  TMP_MAX  - maximum number of names that will be tried before
+             giving up.
+  tempdir  - If this is set to a string before the first use of
+             any routine from this module, it will be considered as
+             another candidate location to store temporary files.
+"""
+
+==========================================================================================
+textwrap
+"""Text wrapping and filling.
+"""
+
+==========================================================================================
+threading
+"""Thread module emulating a subset of Java's threading model."""
+
+==========================================================================================
+timeit
+"""Tool for measuring execution time of small code snippets.
+
+This module avoids a number of common traps for measuring execution
+times.  See also Tim Peters' introduction to the Algorithms chapter in
+the Python Cookbook, published by O'Reilly.
+
+Library usage: see the Timer class.
+
+Command line usage:
+    python timeit.py [-n N] [-r N] [-s S] [-t] [-c] [-p] [-h] [--] [statement]
+
+Options:
+  -n/--number N: how many times to execute 'statement' (default: see below)
+  -r/--repeat N: how many times to repeat the timer (default 3)
+  -s/--setup S: statement to be executed once initially (default 'pass').
+                Execution time of this setup statement is NOT timed.
+  -p/--process: use time.process_time() (default is time.perf_counter())
+  -t/--time: use time.time() (deprecated)
+  -c/--clock: use time.clock() (deprecated)
+  -v/--verbose: print raw timing results; repeat for more digits precision
+  -u/--unit: set the output time unit (usec, msec, or sec)
+  -h/--help: print this usage message and exit
+  --: separate options from statement, use when statement starts with -
+  statement: statement to be timed (default 'pass')
+
+A multi-line statement may be given by specifying each line as a
+separate argument; indented lines are possible by enclosing an
+argument in quotes and using leading spaces.  Multiple -s options are
+treated similarly.
+
+If -n is not given, a suitable number of loops is calculated by trying
+successive powers of 10 until the total time is at least 0.2 seconds.
+
+Note: there is a certain baseline overhead associated with executing a
+pass statement.  It differs between versions.  The code here doesn't try
+to hide it, but you should be aware of it.  The baseline overhead can be
+measured by invoking the program without arguments.
+
+Classes:
+
+    Timer
+
+Functions:
+
+    timeit(string, string) -> float
+    repeat(string, string) -> list
+    default_timer() -> float
+
+"""
+
+==========================================================================================
+token
+"""Token constants (from "token.h")."""
+
+==========================================================================================
+tokenize
+"""Tokenization help for Python programs.
+
+tokenize(readline) is a generator that breaks a stream of bytes into
+Python tokens.  It decodes the bytes according to PEP-0263 for
+determining source file encoding.
+
+It accepts a readline-like method which is called repeatedly to get the
+next line of input (or b"" for EOF).  It generates 5-tuples with these
+members:
+
+    the token type (see token.py)
+    the token (a string)
+    the starting (row, column) indices of the token (a 2-tuple of ints)
+    the ending (row, column) indices of the token (a 2-tuple of ints)
+    the original line (string)
+
+It is designed to match the working of the Python tokenizer exactly, except
+that it produces COMMENT tokens for comments and gives type OP for all
+operators.  Additionally, all token lists start with an ENCODING token
+which tells you which encoding was used to decode the bytes stream.
+"""
+
+==========================================================================================
+trace
+"""program/module to trace Python program or function execution
+
+Sample use, command line:
+  trace.py -c -f counts --ignore-dir '$prefix' spam.py eggs
+  trace.py -t --ignore-dir '$prefix' spam.py eggs
+  trace.py --trackcalls spam.py eggs
+
+Sample use, programmatically
+  import sys
+
+  # create a Trace object, telling it what to ignore, and whether to
+  # do tracing or line-counting or both.
+  tracer = trace.Trace(ignoredirs=[sys.base_prefix, sys.base_exec_prefix,],
+                       trace=0, count=1)
+  # run the new command using the given tracer
+  tracer.run('main()')
+  # make a report, placing output in /tmp
+  r = tracer.results()
+  r.write_results(show_missing=True, coverdir="/tmp")
+"""
+
+==========================================================================================
+traceback
+"""Extract, format and print information about Python stack traces."""
+
+==========================================================================================
+tty
+"""Terminal utilities."""
+
+==========================================================================================
+turtle
+"""
+
+==========================================================================================
+types
+"""
+
+==========================================================================================
+uu
+"""Implementation of the UUencode and UUdecode functions.
+
+encode(in_file, out_file [,name, mode])
+decode(in_file [, out_file, mode])
+"""
+
+==========================================================================================
+uuid
+r"""UUID objects (universally unique identifiers) according to RFC 4122.
+
+This module provides immutable UUID objects (class UUID) and the functions
+uuid1(), uuid3(), uuid4(), uuid5() for generating version 1, 3, 4, and 5
+UUIDs as specified in RFC 4122.
+
+If all you want is a unique ID, you should probably call uuid1() or uuid4().
+Note that uuid1() may compromise privacy since it creates a UUID containing
+the computer's network address.  uuid4() creates a random UUID.
+
+Typical usage:
+
+    >>> import uuid
+
+    # make a UUID based on the host ID and current time
+    >>> uuid.uuid1()    # doctest: +SKIP
+    UUID('a8098c1a-f86e-11da-bd1a-00112444be1e')
+
+    # make a UUID using an MD5 hash of a namespace UUID and a name
+    >>> uuid.uuid3(uuid.NAMESPACE_DNS, 'python.org')
+    UUID('6fa459ea-ee8a-3ca4-894e-db77e160355e')
+
+    # make a random UUID
+    >>> uuid.uuid4()    # doctest: +SKIP
+    UUID('16fd2706-8baf-433b-82eb-8c7fada847da')
+
+    # make a UUID using a SHA-1 hash of a namespace UUID and a name
+    >>> uuid.uuid5(uuid.NAMESPACE_DNS, 'python.org')
+    UUID('886313e1-3b8a-5372-9b90-0c9aee199e5d')
+
+    # make a UUID from a string of hex digits (braces and hyphens ignored)
+    >>> x = uuid.UUID('{00010203-0405-0607-0809-0a0b0c0d0e0f}')
+
+    # convert a UUID to a string of hex digits in standard form
+    >>> str(x)
+    '00010203-0405-0607-0809-0a0b0c0d0e0f'
+
+    # get the raw 16 bytes of the UUID
+    >>> x.bytes
+    b'\x00\x01\x02\x03\x04\x05\x06\x07\x08\t\n\x0b\x0c\r\x0e\x0f'
+
+    # make a UUID from a 16-byte string
+    >>> uuid.UUID(bytes=x.bytes)
+    UUID('00010203-0405-0607-0809-0a0b0c0d0e0f')
+"""
+
+==========================================================================================
+warnings
+"""Python part of the warnings subsystem."""
+
+==========================================================================================
+wave
+"""Stuff to parse WAVE files.
+
+Usage.
+
+Reading WAVE files:
+      f = wave.open(file, 'r')
+where file is either the name of a file or an open file pointer.
+The open file pointer must have methods read(), seek(), and close().
+When the setpos() and rewind() methods are not used, the seek()
+method is not  necessary.
+
+This returns an instance of a class with the following public methods:
+      getnchannels()  -- returns number of audio channels (1 for
+                         mono, 2 for stereo)
+      getsampwidth()  -- returns sample width in bytes
+      getframerate()  -- returns sampling frequency
+      getnframes()    -- returns number of audio frames
+      getcomptype()   -- returns compression type ('NONE' for linear samples)
+      getcompname()   -- returns human-readable version of
+                         compression type ('not compressed' linear samples)
+      getparams()     -- returns a namedtuple consisting of all of the
+                         above in the above order
+      getmarkers()    -- returns None (for compatibility with the
+                         aifc module)
+      getmark(id)     -- raises an error since the mark does not
+                         exist (for compatibility with the aifc module)
+      readframes(n)   -- returns at most n frames of audio
+      rewind()        -- rewind to the beginning of the audio stream
+      setpos(pos)     -- seek to the specified position
+      tell()          -- return the current position
+      close()         -- close the instance (make it unusable)
+The position returned by tell() and the position given to setpos()
+are compatible and have nothing to do with the actual position in the
+file.
+The close() method is called automatically when the class instance
+is destroyed.
+
+Writing WAVE files:
+      f = wave.open(file, 'w')
+where file is either the name of a file or an open file pointer.
+The open file pointer must have methods write(), tell(), seek(), and
+close().
+
+This returns an instance of a class with the following public methods:
+      setnchannels(n) -- set the number of channels
+      setsampwidth(n) -- set the sample width
+      setframerate(n) -- set the frame rate
+      setnframes(n)   -- set the number of frames
+      setcomptype(type, name)
+                      -- set the compression type and the
+                         human-readable compression type
+      setparams(tuple)
+                      -- set all parameters at once
+      tell()          -- return current position in output file
+      writeframesraw(data)
+                      -- write audio frames without pathing up the
+                         file header
+      writeframes(data)
+                      -- write audio frames and patch up the file header
+      close()         -- patch up the file header and close the
+                         output file
+You should set the parameters before the first writeframesraw or
+writeframes.  The total number of frames does not need to be set,
+but when it is set to the correct value, the header does not have to
+be patched up.
+It is best to first set all parameters, perhaps possibly the
+compression type, and then write audio frames using writeframesraw.
+When all frames have been written, either call writeframes(b'') or
+close() to patch up the sizes in the header.
+The close() method is called automatically when the class instance
+is destroyed.
+"""
+
+==========================================================================================
+weakref
+"""Weak reference support for Python.
+
+This module is an implementation of PEP 205:
+
+http://www.python.org/dev/peps/pep-0205/
+"""
+
+==========================================================================================
+webbrowser
+"""Interfaces for launching and remotely controlling Web browsers."""
+
+==========================================================================================
+xdrlib
+"""Implements (a subset of) Sun XDR -- eXternal Data Representation.
+
+See: RFC 1014
+
+"""
+
+==========================================================================================
+zipfile
+"""
+
+==========================================================================================
+_bootlocale
+"""A minimal subset of the locale module used at interpreter startup
+(imported by the _io module), in order to reduce startup time.
+
+Don't import directly from third-party code; use the `locale` module instead!
+"""
+
+==========================================================================================
+_collections_abc
+"""Abstract Base Classes (ABCs) for collections, according to PEP 3119.
+
+Unit tests are in test_collections.
+"""
+
+==========================================================================================
+_compression
+"""Internal classes used by the gzip, lzma and bz2 modules"""
+
+==========================================================================================
+_dummy_thread
+"""Drop-in replacement for the thread module.
+
+Meant to be used as a brain-dead substitute so that threaded code does
+not need to be rewritten for when the thread module is not present.
+
+Suggested usage is::
+
+    try:
+        import _thread
+    except ImportError:
+        import _dummy_thread as _thread
+
+"""
+
+==========================================================================================
+_markupbase
+"""Shared support for scanning document type declarations in HTML and XHTML.
+
+This module is used as a foundation for the html.parser module.  It has no
+documented public API and should not be used directly.
+
+"""
+
+==========================================================================================
+_osx_support
+"""Shared OS X support functions."""
+
+==========================================================================================
+_pydecimal
+"""
+
+==========================================================================================
+_pyio
+"""
+
+==========================================================================================
+_sitebuiltins
+"""
+
+==========================================================================================
+_strptime
+"""Strptime-related classes and functions.
+
+CLASSES:
+    LocaleTime -- Discovers and stores locale-specific time information
+    TimeRE -- Creates regexes for pattern matching a string of text containing
+                time information
+
+FUNCTIONS:
+    _getlang -- Figure out what language is being used for the locale
+    strptime -- Calculates the time struct represented by the passed-in string
+
+"""
+
+==========================================================================================
+_threading_local
+"""Thread-local objects.
+
+(Note that this module provides a Python version of the threading.local
+ class.  Depending on the version of Python you're using, there may be a
+ faster one available.  You should always import the `local` class from
+ `threading`.)
+
+Thread-local objects support the management of thread-local data.
+If you have data that you want to be local to a thread, simply create
+a thread-local object and use its attributes:
+
+  >>> mydata = local()
+  >>> mydata.number = 42
+  >>> mydata.number
+  42
+
+You can also access the local-object's dictionary:
+
+  >>> mydata.__dict__
+  {'number': 42}
+  >>> mydata.__dict__.setdefault('widgets', [])
+  []
+  >>> mydata.widgets
+  []
+
+What's important about thread-local objects is that their data are
+local to a thread. If we access the data in a different thread:
+
+  >>> log = []
+  >>> def f():
+  ...     items = sorted(mydata.__dict__.items())
+  ...     log.append(items)
+  ...     mydata.number = 11
+  ...     log.append(mydata.number)
+
+  >>> import threading
+  >>> thread = threading.Thread(target=f)
+  >>> thread.start()
+  >>> thread.join()
+  >>> log
+  [[], 11]
+
+we get different data.  Furthermore, changes made in the other thread
+don't affect data seen in this thread:
+
+  >>> mydata.number
+  42
+
+Of course, values you get from a local object, including a __dict__
+attribute, are for whatever thread was current at the time the
+attribute was read.  For that reason, you generally don't want to save
+these values across threads, as they apply only to the thread they
+came from.
+
+You can create custom local objects by subclassing the local class:
+
+  >>> class MyLocal(local):
+  ...     number = 2
+  ...     initialized = False
+  ...     def __init__(self, **kw):
+  ...         if self.initialized:
+  ...             raise SystemError('__init__ called too many times')
+  ...         self.initialized = True
+  ...         self.__dict__.update(kw)
+  ...     def squared(self):
+  ...         return self.number ** 2
+
+This can be useful to support default values, methods and
+initialization.  Note that if you define an __init__ method, it will be
+called each time the local object is used in a separate thread.  This
+is necessary to initialize each thread's dictionary.
+
+Now if we create a local object:
+
+  >>> mydata = MyLocal(color='red')
+
+Now we have a default number:
+
+  >>> mydata.number
+  2
+
+an initial color:
+
+  >>> mydata.color
+  'red'
+  >>> del mydata.color
+
+And a method that operates on the data:
+
+  >>> mydata.squared()
+  4
+
+As before, we can access the data in a separate thread:
+
+  >>> log = []
+  >>> thread = threading.Thread(target=f)
+  >>> thread.start()
+  >>> thread.join()
+  >>> log
+  [[('color', 'red'), ('initialized', True)], 11]
+
+without affecting this thread's data:
+
+  >>> mydata.number
+  2
+  >>> mydata.color
+  Traceback (most recent call last):
+  ...
+  AttributeError: 'MyLocal' object has no attribute 'color'
+
+Note that subclasses can define slots, but they are not thread
+local. They are shared across threads:
+
+  >>> class MyLocal(local):
+  ...     __slots__ = 'number'
+
+  >>> mydata = MyLocal()
+  >>> mydata.number = 42
+  >>> mydata.color = 'red'
+
+So, the separate thread:
+
+  >>> thread = threading.Thread(target=f)
+  >>> thread.start()
+  >>> thread.join()
+
+affects what we see:
+
+  >>> mydata.number
+  11
+
+>>> del mydata
+"""
+
+==========================================================================================
+__future__
+"""Record of phased-in incompatible language changes.
+
+Each line is of the form:
+
+    FeatureName = "_Feature(" OptionalRelease "," MandatoryRelease ","
+                              CompilerFlag ")"
+
+where, normally, OptionalRelease < MandatoryRelease, and both are 5-tuples
+of the same form as sys.version_info:
+
+    (PY_MAJOR_VERSION, # the 2 in 2.1.0a3; an int
+     PY_MINOR_VERSION, # the 1; an int
+     PY_MICRO_VERSION, # the 0; an int
+     PY_RELEASE_LEVEL, # "alpha", "beta", "candidate" or "final"; string
+     PY_RELEASE_SERIAL # the 3; an int
+    )
+
+OptionalRelease records the first release in which
+
+    from __future__ import FeatureName
+
+was accepted.
+
+In the case of MandatoryReleases that have not yet occurred,
+MandatoryRelease predicts the release in which the feature will become part
+of the language.
+
+Else MandatoryRelease records when the feature became part of the language;
+in releases at or after that, modules no longer need
+
+    from __future__ import FeatureName
+
+to use the feature in question, but may continue to use such imports.
+
+MandatoryRelease may also be None, meaning that a planned feature got
+dropped.
+
+Instances of class _Feature have two corresponding methods,
+.getOptionalRelease() and .getMandatoryRelease().
+
+CompilerFlag is the (bitfield) flag that should be passed in the fourth
+argument to the builtin function compile() to enable the feature in
+dynamically compiled code.  This flag is stored in the .compiler_flag
+attribute on _Future instances.  These values must match the appropriate
+
+No feature line is ever to be deleted from this file.
+"""
+
+==========================================================================================
